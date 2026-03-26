@@ -1,0 +1,781 @@
+{
+  "info": {
+    "name": "Community Aid API",
+    "description": "Complete Postman collection for the Community Aid API. Built with Go (Gin). Base URL: http://localhost:3000/api/v1\n\n**Authentication:**\nProtected routes require a Clerk JWT token in the Authorization header:\n`Authorization: Bearer <your_clerk_jwt_token>`\n\n**Rate Limiting:** 60 requests/minute per IP address.",
+    "schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json",
+    "_postman_id": "community-aid-api-v1"
+  },
+  "variable": [
+    {
+      "key": "base_url",
+      "value": "http://localhost:3000/api/v1",
+      "type": "string"
+    },
+    {
+      "key": "auth_token",
+      "value": "<your_clerk_jwt_token>",
+      "type": "string"
+    },
+    {
+      "key": "request_id",
+      "value": "862517b6-3f79-471a-9190-806ab7a540d7",
+      "type": "string",
+      "description": "Replace with a real UUID from your database (must have status=approved for offer creation)"
+    },
+    {
+      "key": "offer_id",
+      "value": "00000000-0000-0000-0000-000000000000",
+      "type": "string",
+      "description": "Replace with a real offer UUID from your database"
+    },
+    {
+      "key": "user_id",
+      "value": "00000000-0000-0000-0000-000000000001",
+      "type": "string",
+      "description": "Replace with a real user UUID from your database"
+    }
+  ],
+  "item": [
+    {
+      "name": "Health",
+      "description": "Public health check endpoints — no authentication required.",
+      "item": [
+        {
+          "name": "Health Check",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{base_url}}/health",
+              "host": ["{{base_url}}"],
+              "path": ["health"]
+            },
+            "description": "Returns server status and current environment. No authentication required."
+          },
+          "response": [
+            {
+              "name": "200 OK",
+              "status": "OK",
+              "code": 200,
+              "header": [{ "key": "Content-Type", "value": "application/json" }],
+              "body": "{\n  \"status\": \"ok\",\n  \"env\": \"development\"\n}"
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "name": "Auth",
+      "description": "Authentication endpoints. Public — no token required.",
+      "item": [
+        {
+          "name": "Register User",
+          "request": {
+            "method": "POST",
+            "header": [
+              { "key": "Content-Type", "value": "application/json" }
+            ],
+            "url": {
+              "raw": "{{base_url}}/auth/register",
+              "host": ["{{base_url}}"],
+              "path": ["auth", "register"]
+            },
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"clerk_id\": \"user_2abc123def456ghi789jkl\",\n  \"full_name\": \"Jane Doe\",\n  \"email\": \"jane.doe@example.com\",\n  \"phone_number\": \"+1-555-123-4567\",\n  \"role\": \"community_member\",\n  \"profile_image_url\": \"https://example.com/avatars/jane.jpg\"\n}",
+              "options": { "raw": { "language": "json" } }
+            },
+            "description": "Creates a new user profile linked to a Clerk account. Call this after a successful Clerk sign-up to persist user data in the application database.\n\n**Required fields:** `clerk_id`, `full_name`, `email`\n**Optional fields:** `phone_number`, `role`, `profile_image_url`"
+          },
+          "response": [
+            {
+              "name": "201 Created",
+              "status": "Created",
+              "code": 201,
+              "header": [{ "key": "Content-Type", "value": "application/json" }],
+              "body": "{\n  \"success\": true,\n  \"data\": {\n    \"id\": \"c3d4e5f6-a7b8-9012-cdef-123456789012\",\n    \"clerk_id\": \"user_2abc123def456ghi789jkl\",\n    \"full_name\": \"Jane Doe\",\n    \"email\": \"jane.doe@example.com\",\n    \"phone_number\": \"+1-555-123-4567\",\n    \"role\": \"community_member\",\n    \"profile_image_url\": \"https://example.com/avatars/jane.jpg\",\n    \"is_active\": true,\n    \"created_at\": \"2026-03-23T10:00:00Z\"\n  }\n}"
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "name": "Users",
+      "description": "User profile management. All endpoints require a valid Clerk JWT token.",
+      "item": [
+        {
+          "name": "Get My Profile",
+          "request": {
+            "method": "GET",
+            "header": [
+              { "key": "Authorization", "value": "Bearer {{auth_token}}" }
+            ],
+            "url": {
+              "raw": "{{base_url}}/users/me",
+              "host": ["{{base_url}}"],
+              "path": ["users", "me"]
+            },
+            "description": "Returns the authenticated user's full profile. Requires a valid Clerk JWT bearer token."
+          },
+          "response": [
+            {
+              "name": "200 OK",
+              "status": "OK",
+              "code": 200,
+              "header": [{ "key": "Content-Type", "value": "application/json" }],
+              "body": "{\n  \"success\": true,\n  \"data\": {\n    \"id\": \"c3d4e5f6-a7b8-9012-cdef-123456789012\",\n    \"clerk_id\": \"user_2abc123def456ghi789jkl\",\n    \"full_name\": \"Jane Doe\",\n    \"email\": \"jane.doe@example.com\",\n    \"phone_number\": \"+1-555-123-4567\",\n    \"bio\": \"Community volunteer based in downtown.\",\n    \"profile_image_url\": \"https://res.cloudinary.com/demo/image/upload/avatar.jpg\",\n    \"role\": \"community_member\",\n    \"is_active\": true,\n    \"created_at\": \"2026-03-23T10:00:00Z\",\n    \"updated_at\": \"2026-03-23T12:00:00Z\"\n  }\n}"
+            }
+          ]
+        },
+        {
+          "name": "Update My Profile",
+          "request": {
+            "method": "PUT",
+            "header": [
+              { "key": "Authorization", "value": "Bearer {{auth_token}}" },
+              { "key": "Content-Type", "value": "application/json" }
+            ],
+            "url": {
+              "raw": "{{base_url}}/users/me",
+              "host": ["{{base_url}}"],
+              "path": ["users", "me"]
+            },
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"full_name\": \"Jane Marie Doe\",\n  \"phone_number\": \"+1-555-987-6543\",\n  \"bio\": \"Passionate community volunteer. I help with food and shelter needs.\"\n}",
+              "options": { "raw": { "language": "json" } }
+            },
+            "description": "Updates the authenticated user's profile. All fields are optional — only include the fields you want to update."
+          },
+          "response": [
+            {
+              "name": "200 OK",
+              "status": "OK",
+              "code": 200,
+              "header": [{ "key": "Content-Type", "value": "application/json" }],
+              "body": "{\n  \"success\": true,\n  \"data\": {\n    \"id\": \"c3d4e5f6-a7b8-9012-cdef-123456789012\",\n    \"full_name\": \"Jane Marie Doe\",\n    \"phone_number\": \"+1-555-987-6543\",\n    \"bio\": \"Passionate community volunteer. I help with food and shelter needs.\",\n    \"updated_at\": \"2026-03-23T13:00:00Z\"\n  }\n}"
+            }
+          ]
+        },
+        {
+          "name": "Upload My Avatar",
+          "request": {
+            "method": "POST",
+            "header": [
+              { "key": "Authorization", "value": "Bearer {{auth_token}}" }
+            ],
+            "url": {
+              "raw": "{{base_url}}/users/me/avatar",
+              "host": ["{{base_url}}"],
+              "path": ["users", "me", "avatar"]
+            },
+            "body": {
+              "mode": "formdata",
+              "formdata": [
+                {
+                  "key": "avatar",
+                  "type": "file",
+                  "src": "/path/to/your/avatar.jpg",
+                  "description": "Image file (JPEG, PNG, WebP). Max size: 8MB."
+                }
+              ]
+            },
+            "description": "Uploads a new avatar image for the authenticated user. The image is stored on Cloudinary and the profile_image_url is updated automatically.\n\n**Constraints:** Max file size 8MB. Accepted formats: JPEG, PNG, WebP."
+          },
+          "response": [
+            {
+              "name": "200 OK",
+              "status": "OK",
+              "code": 200,
+              "header": [{ "key": "Content-Type", "value": "application/json" }],
+              "body": "{\n  \"success\": true,\n  \"data\": {\n    \"profile_image_url\": \"https://res.cloudinary.com/demo/image/upload/v1234567890/avatars/user_abc123.jpg\"\n  }\n}"
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "name": "Requests",
+      "description": "Emergency aid requests. Public read access; creating, updating, and managing requires authentication.",
+      "item": [
+        {
+          "name": "Get All Requests",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{base_url}}/requests?type=food&status=approved&location_name=downtown&page=1&page_size=20",
+              "host": ["{{base_url}}"],
+              "path": ["requests"],
+              "query": [
+                { "key": "type", "value": "food", "description": "Filter by type: medical | food | rescue | shelter" },
+                { "key": "status", "value": "approved", "description": "Filter by status: pending | approved | rejected | closed" },
+                { "key": "location_name", "value": "downtown", "description": "Filter by location name (partial match)" },
+                { "key": "page", "value": "1", "description": "Page number (default: 1)" },
+                { "key": "page_size", "value": "20", "description": "Items per page (default: 20, max: 100)" }
+              ]
+            },
+            "description": "Returns a paginated list of aid requests. All query parameters are optional. No authentication required."
+          },
+          "response": [
+            {
+              "name": "200 OK — Paginated",
+              "status": "OK",
+              "code": 200,
+              "header": [{ "key": "Content-Type", "value": "application/json" }],
+              "body": "{\n  \"success\": true,\n  \"data\": [\n    {\n      \"id\": \"862517b6-3f79-471a-9190-806ab7a540d7\",\n      \"title\": \"Urgent food supplies needed for family of 5\",\n      \"description\": \"We have not had a proper meal in two days. We urgently need canned food and drinking water.\",\n      \"type\": \"food\",\n      \"status\": \"approved\",\n      \"location_name\": \"Downtown Shelter, 45 Main St\",\n      \"latitude\": 40.7128,\n      \"longitude\": -74.006,\n      \"media_urls\": [],\n      \"created_by\": \"c3d4e5f6-a7b8-9012-cdef-123456789012\",\n      \"created_at\": \"2026-03-23T08:00:00Z\"\n    }\n  ],\n  \"meta\": {\n    \"total\": 42,\n    \"page\": 1,\n    \"page_size\": 20,\n    \"total_pages\": 3\n  }\n}"
+            }
+          ]
+        },
+        {
+          "name": "Get Request by ID",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{base_url}}/requests/{{request_id}}",
+              "host": ["{{base_url}}"],
+              "path": ["requests", "{{request_id}}"]
+            },
+            "description": "Returns a single aid request by its ULID. No authentication required."
+          },
+          "response": [
+            {
+              "name": "200 OK",
+              "status": "OK",
+              "code": 200,
+              "header": [{ "key": "Content-Type", "value": "application/json" }],
+              "body": "{\n  \"success\": true,\n  \"data\": {\n    \"id\": \"862517b6-3f79-471a-9190-806ab7a540d7\",\n    \"title\": \"Urgent food supplies needed for family of 5\",\n    \"description\": \"We have not had a proper meal in two days.\",\n    \"type\": \"food\",\n    \"status\": \"approved\",\n    \"location_name\": \"Downtown Shelter, 45 Main St\",\n    \"latitude\": 40.7128,\n    \"longitude\": -74.006,\n    \"media_urls\": [\n      \"https://res.cloudinary.com/demo/image/upload/v1/requests/photo1.jpg\"\n    ],\n    \"created_by\": \"c3d4e5f6-a7b8-9012-cdef-123456789012\",\n    \"created_at\": \"2026-03-23T08:00:00Z\",\n    \"updated_at\": \"2026-03-23T09:00:00Z\"\n  }\n}"
+            },
+            {
+              "name": "404 Not Found",
+              "status": "Not Found",
+              "code": 404,
+              "header": [{ "key": "Content-Type", "value": "application/json" }],
+              "body": "{\n  \"success\": false,\n  \"error\": \"request not found\"\n}"
+            }
+          ]
+        },
+        {
+          "name": "Create Request",
+          "request": {
+            "method": "POST",
+            "header": [
+              { "key": "Authorization", "value": "Bearer {{auth_token}}" }
+            ],
+            "url": {
+              "raw": "{{base_url}}/requests",
+              "host": ["{{base_url}}"],
+              "path": ["requests"]
+            },
+            "body": {
+              "mode": "formdata",
+              "formdata": [
+                { "key": "title", "value": "Urgent medical assistance needed", "type": "text", "description": "Short title (required)" },
+                { "key": "description", "value": "My elderly neighbor needs insulin and cannot afford it this month. Any support would be life-saving.", "type": "text", "description": "Detailed description of the need (required)" },
+                { "key": "type", "value": "medical", "type": "text", "description": "Request type (required): medical | food | rescue | shelter" },
+                { "key": "location_name", "value": "East Side Community Center, 120 Oak Ave", "type": "text", "description": "Human-readable location (required)" },
+                { "key": "latitude", "value": "40.7580", "type": "text", "description": "GPS latitude (optional)" },
+                { "key": "longitude", "value": "-73.9855", "type": "text", "description": "GPS longitude (optional)" },
+                { "key": "media", "src": [], "type": "file", "description": "Supporting images/files (optional). Max 5 files, 32MB total." }
+              ]
+            },
+            "description": "Creates a new emergency aid request. Submitted as multipart/form-data to support file attachments.\n\n**Required fields:** `title`, `description`, `type`, `location_name`\n**Optional:** `latitude`, `longitude`, `media` (up to 5 files, 32MB total)\n\nNew requests start with `status: pending` and require admin approval before being publicly visible."
+          },
+          "response": [
+            {
+              "name": "201 Created",
+              "status": "Created",
+              "code": 201,
+              "header": [{ "key": "Content-Type", "value": "application/json" }],
+              "body": "{\n  \"success\": true,\n  \"data\": {\n    \"id\": \"862517b6-3f79-471a-9190-806ab7a540d7\",\n    \"title\": \"Urgent medical assistance needed\",\n    \"description\": \"My elderly neighbor needs insulin and cannot afford it this month.\",\n    \"type\": \"medical\",\n    \"status\": \"pending\",\n    \"location_name\": \"East Side Community Center, 120 Oak Ave\",\n    \"latitude\": 40.758,\n    \"longitude\": -73.9855,\n    \"media_urls\": [],\n    \"created_by\": \"c3d4e5f6-a7b8-9012-cdef-123456789012\",\n    \"created_at\": \"2026-03-23T10:30:00Z\"\n  }\n}"
+            }
+          ]
+        },
+        {
+          "name": "Get My Requests",
+          "request": {
+            "method": "GET",
+            "header": [
+              { "key": "Authorization", "value": "Bearer {{auth_token}}" }
+            ],
+            "url": {
+              "raw": "{{base_url}}/requests/me",
+              "host": ["{{base_url}}"],
+              "path": ["requests", "me"]
+            },
+            "description": "Returns all aid requests created by the currently authenticated user."
+          },
+          "response": [
+            {
+              "name": "200 OK",
+              "status": "OK",
+              "code": 200,
+              "header": [{ "key": "Content-Type", "value": "application/json" }],
+              "body": "{\n  \"success\": true,\n  \"data\": [\n    {\n      \"id\": \"862517b6-3f79-471a-9190-806ab7a540d7\",\n      \"title\": \"Urgent medical assistance needed\",\n      \"type\": \"medical\",\n      \"status\": \"pending\",\n      \"location_name\": \"East Side Community Center, 120 Oak Ave\",\n      \"created_at\": \"2026-03-23T10:30:00Z\"\n    }\n  ]\n}"
+            }
+          ]
+        },
+        {
+          "name": "Update Request",
+          "request": {
+            "method": "PUT",
+            "header": [
+              { "key": "Authorization", "value": "Bearer {{auth_token}}" },
+              { "key": "Content-Type", "value": "application/json" }
+            ],
+            "url": {
+              "raw": "{{base_url}}/requests/{{request_id}}",
+              "host": ["{{base_url}}"],
+              "path": ["requests", "{{request_id}}"]
+            },
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"title\": \"Urgent medical assistance needed — insulin required\",\n  \"description\": \"Updated: My elderly neighbor urgently needs insulin. Situation has worsened.\",\n  \"status\": \"closed\",\n  \"location_name\": \"East Side Clinic, 130 Oak Ave\",\n  \"latitude\": 40.759,\n  \"longitude\": -73.986\n}",
+              "options": { "raw": { "language": "json" } }
+            },
+            "description": "Updates an existing request. Only the request owner or an admin can update a request. All fields are optional."
+          },
+          "response": [
+            {
+              "name": "200 OK",
+              "status": "OK",
+              "code": 200,
+              "header": [{ "key": "Content-Type", "value": "application/json" }],
+              "body": "{\n  \"success\": true,\n  \"data\": {\n    \"id\": \"862517b6-3f79-471a-9190-806ab7a540d7\",\n    \"title\": \"Urgent medical assistance needed — insulin required\",\n    \"status\": \"closed\",\n    \"updated_at\": \"2026-03-23T15:00:00Z\"\n  }\n}"
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "name": "Offers",
+      "description": "Offers to help with aid requests. Creating and viewing offers is public; updating offer status requires authentication.",
+      "item": [
+        {
+          "name": "Create Offer",
+          "request": {
+            "method": "POST",
+            "header": [
+              { "key": "Content-Type", "value": "application/json" }
+            ],
+            "url": {
+              "raw": "{{base_url}}/offers",
+              "host": ["{{base_url}}"],
+              "path": ["offers"]
+            },
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"request_id\": \"862517b6-3f79-471a-9190-806ab7a540d7\",\n  \"responder_name\": \"John Smith\",\n  \"responder_contact\": \"john.smith@example.com\",\n  \"offer_type\": \"donation\",\n  \"latitude\": 40.7128,\n  \"longitude\": -74.006\n}",
+              "options": { "raw": { "language": "json" } }
+            },
+            "description": "Submits an offer to help with an approved aid request. No authentication required — community members can offer help anonymously.\n\n**Required fields:** `request_id`, `responder_name`, `responder_contact`, `offer_type`\n**offer_type enum:** `transport` | `donation` | `expertise`\n**Optional:** `latitude`, `longitude` (responder's location)\n\nThe target request must have `status: approved`."
+          },
+          "response": [
+            {
+              "name": "201 Created",
+              "status": "Created",
+              "code": 201,
+              "header": [{ "key": "Content-Type", "value": "application/json" }],
+              "body": "{\n  \"success\": true,\n  \"data\": {\n    \"id\": \"a1b2c3d4-e5f6-7890-abcd-ef1234567890\",\n    \"request_id\": \"862517b6-3f79-471a-9190-806ab7a540d7\",\n    \"responder_name\": \"John Smith\",\n    \"responder_contact\": \"john.smith@example.com\",\n    \"offer_type\": \"donation\",\n    \"status\": \"pending\",\n    \"latitude\": 40.7128,\n    \"longitude\": -74.006,\n    \"created_at\": \"2026-03-23T11:00:00Z\"\n  }\n}"
+            }
+          ]
+        },
+        {
+          "name": "Get Offers by Request ID",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{base_url}}/offers/request/{{request_id}}",
+              "host": ["{{base_url}}"],
+              "path": ["offers", "request", "{{request_id}}"]
+            },
+            "description": "Returns all offers submitted for a specific aid request. No authentication required."
+          },
+          "response": [
+            {
+              "name": "200 OK",
+              "status": "OK",
+              "code": 200,
+              "header": [{ "key": "Content-Type", "value": "application/json" }],
+              "body": "{\n  \"success\": true,\n  \"data\": [\n    {\n      \"id\": \"a1b2c3d4-e5f6-7890-abcd-ef1234567890\",\n      \"request_id\": \"862517b6-3f79-471a-9190-806ab7a540d7\",\n      \"responder_name\": \"John Smith\",\n      \"responder_contact\": \"john.smith@example.com\",\n      \"offer_type\": \"donation\",\n      \"status\": \"pending\",\n      \"created_at\": \"2026-03-23T11:00:00Z\"\n    },\n    {\n      \"id\": \"b2c3d4e5-f6a7-8901-bcde-f12345678901\",\n      \"request_id\": \"862517b6-3f79-471a-9190-806ab7a540d7\",\n      \"responder_name\": \"Alice Johnson\",\n      \"responder_contact\": \"+1-555-000-1111\",\n      \"offer_type\": \"transport\",\n      \"status\": \"accepted\",\n      \"created_at\": \"2026-03-23T11:30:00Z\"\n    }\n  ]\n}"
+            }
+          ]
+        },
+        {
+          "name": "Update Offer Status",
+          "request": {
+            "method": "PUT",
+            "header": [
+              { "key": "Authorization", "value": "Bearer {{auth_token}}" },
+              { "key": "Content-Type", "value": "application/json" }
+            ],
+            "url": {
+              "raw": "{{base_url}}/offers/{{offer_id}}/status",
+              "host": ["{{base_url}}"],
+              "path": ["offers", "{{offer_id}}", "status"]
+            },
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"status\": \"accepted\"\n}",
+              "options": { "raw": { "language": "json" } }
+            },
+            "description": "Updates the status of an offer. Only the owner of the associated request or an admin can perform this action.\n\n**status enum:** `pending` | `accepted` | `fulfilled`"
+          },
+          "response": [
+            {
+              "name": "200 OK",
+              "status": "OK",
+              "code": 200,
+              "header": [{ "key": "Content-Type", "value": "application/json" }],
+              "body": "{\n  \"success\": true,\n  \"data\": {\n    \"id\": \"a1b2c3d4-e5f6-7890-abcd-ef1234567890\",\n    \"status\": \"accepted\",\n    \"updated_at\": \"2026-03-23T14:00:00Z\"\n  }\n}"
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "name": "Admin — Requests",
+      "description": "Admin-only request management endpoints. Require a valid Clerk JWT token AND user role must be `admin`.",
+      "item": [
+        {
+          "name": "Get All Requests (Admin)",
+          "request": {
+            "method": "GET",
+            "header": [
+              { "key": "Authorization", "value": "Bearer {{auth_token}}" }
+            ],
+            "url": {
+              "raw": "{{base_url}}/admin/requests?type=medical&status=pending&page=1&page_size=20",
+              "host": ["{{base_url}}"],
+              "path": ["admin", "requests"],
+              "query": [
+                { "key": "type", "value": "medical", "description": "Filter by type (optional)" },
+                { "key": "status", "value": "pending", "description": "Filter by status (optional)" },
+                { "key": "page", "value": "1", "description": "Page number (default: 1)" },
+                { "key": "page_size", "value": "20", "description": "Items per page (default: 20, max: 100)" }
+              ]
+            },
+            "description": "Admin view of all requests with full filter and pagination support. Includes requests of all statuses including rejected and closed."
+          },
+          "response": [
+            {
+              "name": "200 OK — Paginated",
+              "status": "OK",
+              "code": 200,
+              "header": [{ "key": "Content-Type", "value": "application/json" }],
+              "body": "{\n  \"success\": true,\n  \"data\": [\n    {\n      \"id\": \"862517b6-3f79-471a-9190-806ab7a540d7\",\n      \"title\": \"Urgent medical assistance needed\",\n      \"type\": \"medical\",\n      \"status\": \"pending\",\n      \"location_name\": \"East Side Community Center, 120 Oak Ave\",\n      \"created_by\": \"c3d4e5f6-a7b8-9012-cdef-123456789012\",\n      \"created_at\": \"2026-03-23T10:30:00Z\"\n    }\n  ],\n  \"meta\": {\n    \"total\": 150,\n    \"page\": 1,\n    \"page_size\": 20,\n    \"total_pages\": 8\n  }\n}"
+            }
+          ]
+        },
+        {
+          "name": "Approve Request",
+          "request": {
+            "method": "POST",
+            "header": [
+              { "key": "Authorization", "value": "Bearer {{auth_token}}" }
+            ],
+            "url": {
+              "raw": "{{base_url}}/requests/{{request_id}}/approve",
+              "host": ["{{base_url}}"],
+              "path": ["requests", "{{request_id}}", "approve"]
+            },
+            "description": "Approves a pending aid request, making it publicly visible and eligible to receive offers. Admin only."
+          },
+          "response": [
+            {
+              "name": "200 OK",
+              "status": "OK",
+              "code": 200,
+              "header": [{ "key": "Content-Type", "value": "application/json" }],
+              "body": "{\n  \"success\": true,\n  \"data\": {\n    \"id\": \"862517b6-3f79-471a-9190-806ab7a540d7\",\n    \"status\": \"approved\",\n    \"updated_at\": \"2026-03-23T11:00:00Z\"\n  }\n}"
+            }
+          ]
+        },
+        {
+          "name": "Reject Request",
+          "request": {
+            "method": "POST",
+            "header": [
+              { "key": "Authorization", "value": "Bearer {{auth_token}}" }
+            ],
+            "url": {
+              "raw": "{{base_url}}/requests/{{request_id}}/reject",
+              "host": ["{{base_url}}"],
+              "path": ["requests", "{{request_id}}", "reject"]
+            },
+            "description": "Rejects a pending aid request. Admin only."
+          },
+          "response": [
+            {
+              "name": "200 OK",
+              "status": "OK",
+              "code": 200,
+              "header": [{ "key": "Content-Type", "value": "application/json" }],
+              "body": "{\n  \"success\": true,\n  \"data\": {\n    \"id\": \"862517b6-3f79-471a-9190-806ab7a540d7\",\n    \"status\": \"rejected\",\n    \"updated_at\": \"2026-03-23T11:05:00Z\"\n  }\n}"
+            }
+          ]
+        },
+        {
+          "name": "Delete Request",
+          "request": {
+            "method": "DELETE",
+            "header": [
+              { "key": "Authorization", "value": "Bearer {{auth_token}}" }
+            ],
+            "url": {
+              "raw": "{{base_url}}/requests/{{request_id}}",
+              "host": ["{{base_url}}"],
+              "path": ["requests", "{{request_id}}"]
+            },
+            "description": "Permanently deletes an aid request. Admin only. Returns 204 No Content on success."
+          },
+          "response": [
+            {
+              "name": "204 No Content",
+              "status": "No Content",
+              "code": 204,
+              "header": [],
+              "body": ""
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "name": "Admin — Offers",
+      "description": "Admin-only offer management. Requires Clerk JWT token with admin role.",
+      "item": [
+        {
+          "name": "Get All Offers (Admin)",
+          "request": {
+            "method": "GET",
+            "header": [
+              { "key": "Authorization", "value": "Bearer {{auth_token}}" }
+            ],
+            "url": {
+              "raw": "{{base_url}}/admin/offers?page=1&page_size=20",
+              "host": ["{{base_url}}"],
+              "path": ["admin", "offers"],
+              "query": [
+                { "key": "page", "value": "1", "description": "Page number (default: 1)" },
+                { "key": "page_size", "value": "20", "description": "Items per page (default: 20, max: 100)" }
+              ]
+            },
+            "description": "Returns a paginated list of all offers across all requests. Admin only."
+          },
+          "response": [
+            {
+              "name": "200 OK — Paginated",
+              "status": "OK",
+              "code": 200,
+              "header": [{ "key": "Content-Type", "value": "application/json" }],
+              "body": "{\n  \"success\": true,\n  \"data\": [\n    {\n      \"id\": \"a1b2c3d4-e5f6-7890-abcd-ef1234567890\",\n      \"request_id\": \"862517b6-3f79-471a-9190-806ab7a540d7\",\n      \"responder_name\": \"John Smith\",\n      \"responder_contact\": \"john.smith@example.com\",\n      \"offer_type\": \"donation\",\n      \"status\": \"pending\",\n      \"created_at\": \"2026-03-23T11:00:00Z\"\n    }\n  ],\n  \"meta\": {\n    \"total\": 85,\n    \"page\": 1,\n    \"page_size\": 20,\n    \"total_pages\": 5\n  }\n}"
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "name": "Admin — Donations",
+      "description": "Donation tracking management. Admin only — requires Clerk JWT token with admin role.",
+      "item": [
+        {
+          "name": "Create Donation",
+          "request": {
+            "method": "POST",
+            "header": [
+              { "key": "Authorization", "value": "Bearer {{auth_token}}" },
+              { "key": "Content-Type", "value": "application/json" }
+            ],
+            "url": {
+              "raw": "{{base_url}}/admin/donations",
+              "host": ["{{base_url}}"],
+              "path": ["admin", "donations"]
+            },
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"request_id\": \"862517b6-3f79-471a-9190-806ab7a540d7\",\n  \"donor_name\": \"Anonymous Donor\",\n  \"amount\": 150.00,\n  \"date\": \"2026-03-23\"\n}",
+              "options": { "raw": { "language": "json" } }
+            },
+            "description": "Records a new donation linked to an aid request. Admin only.\n\n**Required fields:** `request_id`, `donor_name`, `amount` (must be > 0), `date` (ISO date string)\n\nDonations are tracked for reporting and dashboard statistics."
+          },
+          "response": [
+            {
+              "name": "201 Created",
+              "status": "Created",
+              "code": 201,
+              "header": [{ "key": "Content-Type", "value": "application/json" }],
+              "body": "{\n  \"success\": true,\n  \"data\": {\n    \"id\": \"d4e5f6a7-b8c9-0123-defa-234567890123\",\n    \"request_id\": \"862517b6-3f79-471a-9190-806ab7a540d7\",\n    \"donor_name\": \"Anonymous Donor\",\n    \"amount\": 150.00,\n    \"date\": \"2026-03-23\",\n    \"created_at\": \"2026-03-23T12:00:00Z\"\n  }\n}"
+            }
+          ]
+        },
+        {
+          "name": "Get All Donations (Admin)",
+          "request": {
+            "method": "GET",
+            "header": [
+              { "key": "Authorization", "value": "Bearer {{auth_token}}" }
+            ],
+            "url": {
+              "raw": "{{base_url}}/admin/donations?page=1&page_size=20",
+              "host": ["{{base_url}}"],
+              "path": ["admin", "donations"],
+              "query": [
+                { "key": "page", "value": "1", "description": "Page number (default: 1)" },
+                { "key": "page_size", "value": "20", "description": "Items per page (default: 20, max: 100)" }
+              ]
+            },
+            "description": "Returns a paginated list of all donation records. Admin only."
+          },
+          "response": [
+            {
+              "name": "200 OK — Paginated",
+              "status": "OK",
+              "code": 200,
+              "header": [{ "key": "Content-Type", "value": "application/json" }],
+              "body": "{\n  \"success\": true,\n  \"data\": [\n    {\n      \"id\": \"d4e5f6a7-b8c9-0123-defa-234567890123\",\n      \"request_id\": \"862517b6-3f79-471a-9190-806ab7a540d7\",\n      \"donor_name\": \"Anonymous Donor\",\n      \"amount\": 150.00,\n      \"date\": \"2026-03-23\",\n      \"created_at\": \"2026-03-23T12:00:00Z\"\n    }\n  ],\n  \"meta\": {\n    \"total\": 37,\n    \"page\": 1,\n    \"page_size\": 20,\n    \"total_pages\": 2\n  }\n}"
+            }
+          ]
+        },
+        {
+          "name": "Get Donations by Request ID (Admin)",
+          "request": {
+            "method": "GET",
+            "header": [
+              { "key": "Authorization", "value": "Bearer {{auth_token}}" }
+            ],
+            "url": {
+              "raw": "{{base_url}}/admin/donations/{{request_id}}",
+              "host": ["{{base_url}}"],
+              "path": ["admin", "donations", "{{request_id}}"]
+            },
+            "description": "Returns all donation records for a specific aid request. Admin only."
+          },
+          "response": [
+            {
+              "name": "200 OK",
+              "status": "OK",
+              "code": 200,
+              "header": [{ "key": "Content-Type", "value": "application/json" }],
+              "body": "{\n  \"success\": true,\n  \"data\": [\n    {\n      \"id\": \"d4e5f6a7-b8c9-0123-defa-234567890123\",\n      \"request_id\": \"862517b6-3f79-471a-9190-806ab7a540d7\",\n      \"donor_name\": \"Anonymous Donor\",\n      \"amount\": 150.00,\n      \"date\": \"2026-03-23\"\n    },\n    {\n      \"id\": \"e5f6a7b8-c9d0-1234-efab-345678901234\",\n      \"request_id\": \"862517b6-3f79-471a-9190-806ab7a540d7\",\n      \"donor_name\": \"Community Fund\",\n      \"amount\": 500.00,\n      \"date\": \"2026-03-22\"\n    }\n  ]\n}"
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "name": "Admin — Users",
+      "description": "Admin-only user management endpoints. Requires Clerk JWT token with admin role.",
+      "item": [
+        {
+          "name": "Get All Users (Admin)",
+          "request": {
+            "method": "GET",
+            "header": [
+              { "key": "Authorization", "value": "Bearer {{auth_token}}" }
+            ],
+            "url": {
+              "raw": "{{base_url}}/admin/users?page=1&page_size=20",
+              "host": ["{{base_url}}"],
+              "path": ["admin", "users"],
+              "query": [
+                { "key": "page", "value": "1", "description": "Page number (default: 1)" },
+                { "key": "page_size", "value": "20", "description": "Items per page (default: 20, max: 100)" }
+              ]
+            },
+            "description": "Returns a paginated list of all registered users. Admin only."
+          },
+          "response": [
+            {
+              "name": "200 OK — Paginated",
+              "status": "OK",
+              "code": 200,
+              "header": [{ "key": "Content-Type", "value": "application/json" }],
+              "body": "{\n  \"success\": true,\n  \"data\": [\n    {\n      \"id\": \"c3d4e5f6-a7b8-9012-cdef-123456789012\",\n      \"clerk_id\": \"user_2abc123def456ghi789jkl\",\n      \"full_name\": \"Jane Doe\",\n      \"email\": \"jane.doe@example.com\",\n      \"role\": \"community_member\",\n      \"is_active\": true,\n      \"created_at\": \"2026-03-23T10:00:00Z\"\n    }\n  ],\n  \"meta\": {\n    \"total\": 200,\n    \"page\": 1,\n    \"page_size\": 20,\n    \"total_pages\": 10\n  }\n}"
+            }
+          ]
+        },
+        {
+          "name": "Activate User",
+          "request": {
+            "method": "PUT",
+            "header": [
+              { "key": "Authorization", "value": "Bearer {{auth_token}}" }
+            ],
+            "url": {
+              "raw": "{{base_url}}/admin/users/{{user_id}}/activate",
+              "host": ["{{base_url}}"],
+              "path": ["admin", "users", "{{user_id}}", "activate"]
+            },
+            "description": "Activates a deactivated user account, restoring their access to the platform. Admin only."
+          },
+          "response": [
+            {
+              "name": "200 OK",
+              "status": "OK",
+              "code": 200,
+              "header": [{ "key": "Content-Type", "value": "application/json" }],
+              "body": "{\n  \"success\": true,\n  \"data\": {\n    \"id\": \"c3d4e5f6-a7b8-9012-cdef-123456789012\",\n    \"is_active\": true,\n    \"updated_at\": \"2026-03-23T16:00:00Z\"\n  }\n}"
+            }
+          ]
+        },
+        {
+          "name": "Deactivate User",
+          "request": {
+            "method": "PUT",
+            "header": [
+              { "key": "Authorization", "value": "Bearer {{auth_token}}" }
+            ],
+            "url": {
+              "raw": "{{base_url}}/admin/users/{{user_id}}/deactivate",
+              "host": ["{{base_url}}"],
+              "path": ["admin", "users", "{{user_id}}", "deactivate"]
+            },
+            "description": "Deactivates a user account, preventing them from accessing protected endpoints. Admin only."
+          },
+          "response": [
+            {
+              "name": "200 OK",
+              "status": "OK",
+              "code": 200,
+              "header": [{ "key": "Content-Type", "value": "application/json" }],
+              "body": "{\n  \"success\": true,\n  \"data\": {\n    \"id\": \"c3d4e5f6-a7b8-9012-cdef-123456789012\",\n    \"is_active\": false,\n    \"updated_at\": \"2026-03-23T16:30:00Z\"\n  }\n}"
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "name": "Admin — Dashboard",
+      "description": "Admin analytics and statistics. Requires Clerk JWT token with admin role.",
+      "item": [
+        {
+          "name": "Get Dashboard Stats",
+          "request": {
+            "method": "GET",
+            "header": [
+              { "key": "Authorization", "value": "Bearer {{auth_token}}" }
+            ],
+            "url": {
+              "raw": "{{base_url}}/admin/stats",
+              "host": ["{{base_url}}"],
+              "path": ["admin", "stats"]
+            },
+            "description": "Returns comprehensive dashboard statistics including user counts, request status breakdown, offer metrics, and total donation amounts. Admin only."
+          },
+          "response": [
+            {
+              "name": "200 OK",
+              "status": "OK",
+              "code": 200,
+              "header": [{ "key": "Content-Type", "value": "application/json" }],
+              "body": "{\n  \"success\": true,\n  \"data\": {\n    \"total_users\": 200,\n    \"active_users\": 185,\n    \"total_requests\": 150,\n    \"pending_requests\": 12,\n    \"approved_requests\": 98,\n    \"rejected_requests\": 8,\n    \"closed_requests\": 32,\n    \"total_offers\": 85,\n    \"pending_offers\": 20,\n    \"accepted_offers\": 45,\n    \"fulfilled_offers\": 20,\n    \"total_donations\": 37,\n    \"total_donation_amount\": 14750.50\n  }\n}"
+            }
+          ]
+        }
+      ]
+    }
+  ]
+}

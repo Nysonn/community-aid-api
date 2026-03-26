@@ -12,7 +12,7 @@ type Donation struct {
 }
 
 type CreateDonationInput struct {
-	RequestID string  `json:"request_id" validate:"required"`
+	RequestID string  `json:"request_id" validate:"required,uuid"`
 	DonorName string  `json:"donor_name" validate:"required"`
 	Amount    float64 `json:"amount"     validate:"required,gt=0"`
 	Date      string  `json:"date"       validate:"required"`

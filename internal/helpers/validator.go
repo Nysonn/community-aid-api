@@ -40,6 +40,8 @@ func ValidateStruct(s interface{}) error {
 			msgs = append(msgs, fmt.Sprintf("%s must be a valid email address", field))
 		case "oneof":
 			msgs = append(msgs, fmt.Sprintf("%s must be one of %s", field, e.Param()))
+		case "uuid":
+			msgs = append(msgs, fmt.Sprintf("%s must be a valid UUID", field))
 		case "gt":
 			msgs = append(msgs, fmt.Sprintf("%s must be greater than %s", field, e.Param()))
 		case "gte":
