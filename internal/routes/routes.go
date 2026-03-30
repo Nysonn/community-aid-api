@@ -29,7 +29,7 @@ func SetupRoutes(
 	userHandler := handlers.NewUserHandler(userSvc, cld)
 	requestHandler := handlers.NewRequestHandler(requestSvc, emailSvc, cld, db)
 	offerHandler := handlers.NewOfferHandler(offerSvc, requestSvc, emailSvc, db)
-	donationHandler := handlers.NewDonationHandler(donationSvc, requestSvc)
+	donationHandler := handlers.NewDonationHandler(donationSvc)
 	adminHandler := handlers.NewAdminHandler(userSvc, requestSvc, offerSvc, donationSvc, db)
 
 	v1 := router.Group("/api/v1")
@@ -75,7 +75,6 @@ func SetupRoutes(
 
 		adminRoutes.GET("/admin/offers", offerHandler.GetAllOffersAdmin)
 
-		adminRoutes.POST("/admin/donations", donationHandler.CreateDonation)
 		adminRoutes.GET("/admin/donations", donationHandler.GetAllDonationsAdmin)
 		adminRoutes.GET("/admin/donations/:request_id", donationHandler.GetDonationsByRequestID)
 
