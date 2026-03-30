@@ -5,6 +5,7 @@ import (
 	"database/sql"
 	"errors"
 	"fmt"
+	"time"
 
 	"community-aid-api/internal/models"
 )
@@ -17,29 +18,130 @@ func NewOfferService(db *sql.DB) *OfferService {
 	return &OfferService{db: db}
 }
 
-const offerCols = `id, request_id, responder_name, responder_contact, offer_type, status, latitude, longitude, created_at, updated_at`
+const offerCols = `id, request_id, responder_name, responder_contact, offer_type, status,
+	expertise_details, vehicle_type, donation_amount, payment_method, mobile_money_provider,
+	mobile_money_number_masked, card_last4, card_expiry_month, card_expiry_year, cardholder_name,
+	latitude, longitude, created_at, updated_at`
 
 func scanOffer(row interface{ Scan(...any) error }) (*models.Offer, error) {
 	var o models.Offer
+	var expertiseDetails sql.NullString
+	var vehicleType sql.NullString
+	var donationAmount sql.NullFloat64
+	var paymentMethod sql.NullString
+	var mobileMoneyProvider sql.NullString
+	var mobileMoneyNumberMasked sql.NullString
+	var cardLast4 sql.NullString
+	var cardExpiryMonth sql.NullInt64
+	var cardExpiryYear sql.NullInt64
+	var cardholderName sql.NullString
+	var latitude sql.NullFloat64
+	var longitude sql.NullFloat64
 	err := row.Scan(
 		&o.ID, &o.RequestID, &o.ResponderName, &o.ResponderContact,
-		&o.OfferType, &o.Status, &o.Latitude, &o.Longitude,
+		&o.OfferType, &o.Status,
+		&expertiseDetails, &vehicleType, &donationAmount, &paymentMethod, &mobileMoneyProvider,
+		&mobileMoneyNumberMasked, &cardLast4, &cardExpiryMonth, &cardExpiryYear, &cardholderName,
+		&latitude, &longitude,
 		&o.CreatedAt, &o.UpdatedAt,
 	)
+	if err != nil {
+		return nil, err
+	}
+	if expertiseDetails.Valid {
+		o.ExpertiseDetails = &expertiseDetails.String
+	}
+	if vehicleType.Valid {
+		o.VehicleType = &vehicleType.String
+	}
+	if donationAmount.Valid {
+		o.DonationAmount = &donationAmount.Float64
+	}
+	if paymentMethod.Valid {
+		o.PaymentMethod = &paymentMethod.String
+	}
+	if mobileMoneyProvider.Valid {
+		o.MobileMoneyProvider = &mobileMoneyProvider.String
+	}
+	if mobileMoneyNumberMasked.Valid {
+		o.MobileMoneyNumberMasked = &mobileMoneyNumberMasked.String
+	}
+	if cardLast4.Valid {
+		o.CardLast4 = &cardLast4.String
+	}
+	if cardExpiryMonth.Valid {
+		month := int(cardExpiryMonth.Int64)
+		o.CardExpiryMonth = &month
+	}
+	if cardExpiryYear.Valid {
+		year := int(cardExpiryYear.Int64)
+		o.CardExpiryYear = &year
+	}
+	if cardholderName.Valid {
+		o.CardholderName = &cardholderName.String
+	}
+	if latitude.Valid {
+		o.Latitude = &latitude.Float64
+	}
+	if longitude.Valid {
+		o.Longitude = &longitude.Float64
+	}
 	return &o, err
 }
 
 func (s *OfferService) CreateOffer(ctx context.Context, input models.CreateOfferInput) (*models.Offer, error) {
-	row := s.db.QueryRowContext(ctx,
-		`INSERT INTO offers (request_id, responder_name, responder_contact, offer_type, status, latitude, longitude)
-		 VALUES ($1, $2, $3, $4, 'pending', $5, $6)
+	tx, err := s.db.BeginTx(ctx, nil)
+	if err != nil {
+		return nil, fmt.Errorf("begin create offer tx: %w", err)
+	}
+	defer tx.Rollback()
+
+	row := tx.QueryRowContext(ctx,
+		`INSERT INTO offers (
+			request_id, responder_name, responder_contact, offer_type, status,
+			expertise_details, vehicle_type, donation_amount, payment_method, mobile_money_provider,
+			mobile_money_number_masked, card_last4, card_expiry_month, card_expiry_year, cardholder_name,
+			latitude, longitude
+		)
+		 VALUES ($1, $2, $3, $4, 'pending', $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, $16)
 		 RETURNING `+offerCols,
-		input.RequestID, input.ResponderName, input.ResponderContact, input.OfferType,
-		input.Latitude, input.Longitude,
+		input.RequestID,
+		input.ResponderName,
+		input.ResponderContact,
+		input.OfferType,
+		input.ExpertiseDetails,
+		input.VehicleType,
+		input.DonationAmount,
+		input.PaymentMethod,
+		input.MobileMoneyProvider,
+		input.MaskedMobileMoneyNumber(),
+		input.CardNumberLast4(),
+		input.CardExpiryMonth,
+		input.CardExpiryYear,
+		input.CardholderName,
+		input.Latitude,
+		input.Longitude,
 	)
 	o, err := scanOffer(row)
 	if err != nil {
 		return nil, fmt.Errorf("create offer: %w", err)
+	}
+
+	if input.OfferType == "donation" && input.DonationAmount != nil {
+		if _, err := tx.ExecContext(ctx,
+			`INSERT INTO donations (request_id, donor_name, amount, date)
+			 VALUES ($1, $2, $3, $4)`,
+			input.RequestID,
+			input.ResponderName,
+			*input.DonationAmount,
+			time.Now().UTC().Format("2006-01-02"),
+		); err != nil {
+			return nil, fmt.Errorf("create linked donation: %w", err)
+		}
+	}
+
+	if err := tx.Commit(); err != nil {
+		return nil, fmt.Errorf("commit create offer: %w", err)
 	}
 	return o, nil
 }

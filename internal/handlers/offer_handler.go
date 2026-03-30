@@ -37,7 +37,12 @@ func (h *OfferHandler) CreateOffer(c *gin.Context) {
 		helpers.ErrorResponse(c, http.StatusBadRequest, "invalid request body")
 		return
 	}
+	input.Normalize()
 	if err := helpers.ValidateStruct(&input); err != nil {
+		helpers.ErrorResponse(c, http.StatusBadRequest, err.Error())
+		return
+	}
+	if err := input.ValidateBusinessRules(); err != nil {
 		helpers.ErrorResponse(c, http.StatusBadRequest, err.Error())
 		return
 	}
