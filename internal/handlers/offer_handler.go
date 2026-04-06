@@ -72,6 +72,11 @@ func (h *OfferHandler) CreateOffer(c *gin.Context) {
 	}
 
 	offer, err := h.offerSvc.CreateOffer(c.Request.Context(), input, req, recipientName)
+	var badRequestErr *services.BadRequestError
+	if errors.As(err, &badRequestErr) {
+		helpers.ErrorResponse(c, http.StatusBadRequest, badRequestErr.Error())
+		return
+	}
 	if err != nil {
 		log.Printf("ERROR CreateOffer save: %v", err)
 		helpers.ErrorResponse(c, http.StatusInternalServerError, "an unexpected error occurred")

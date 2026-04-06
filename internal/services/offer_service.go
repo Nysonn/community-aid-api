@@ -5,6 +5,7 @@ import (
 	"database/sql"
 	"errors"
 	"fmt"
+	"strings"
 	"time"
 
 	"community-aid-api/internal/models"
@@ -94,6 +95,12 @@ func scanOffer(row interface{ Scan(...any) error }) (*models.Offer, error) {
 }
 
 func (s *OfferService) CreateOffer(ctx context.Context, input models.CreateOfferInput, req *models.EmergencyRequest, recipientName string) (*models.Offer, error) {
+	if input.OfferType == "donation" {
+		if err := validateDonationDisbursementDetails(req); err != nil {
+			return nil, err
+		}
+	}
+
 	tx, err := s.db.BeginTx(ctx, nil)
 	if err != nil {
 		return nil, fmt.Errorf("begin create offer tx: %w", err)
@@ -187,6 +194,35 @@ func nullableStr(s *string) interface{} {
 		return nil
 	}
 	return *s
+}
+
+func validateDonationDisbursementDetails(req *models.EmergencyRequest) error {
+	if req == nil {
+		return &BadRequestError{Message: "request not found"}
+	}
+
+	if req.PaymentType == nil {
+		return &BadRequestError{Message: "this request is not configured to receive donations"}
+	}
+
+	switch strings.TrimSpace(*req.PaymentType) {
+	case "bank":
+		if isBlankStringPtr(req.BankAccountName) || isBlankStringPtr(req.BankAccountNumber) || isBlankStringPtr(req.BankName) {
+			return &BadRequestError{Message: "this request is missing bank disbursement details"}
+		}
+	case "mobile_money":
+		if isBlankStringPtr(req.ReceivingMobileProvider) || isBlankStringPtr(req.ReceivingMobileNumber) {
+			return &BadRequestError{Message: "this request is missing mobile money disbursement details"}
+		}
+	default:
+		return &BadRequestError{Message: "this request has an invalid payment configuration"}
+	}
+
+	return nil
+}
+
+func isBlankStringPtr(value *string) bool {
+	return value == nil || strings.TrimSpace(*value) == ""
 }
 
 func (s *OfferService) GetOffersByRequestID(ctx context.Context, requestID string) ([]models.Offer, error) {
