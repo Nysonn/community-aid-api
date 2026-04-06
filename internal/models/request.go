@@ -58,6 +58,14 @@ type UpdateRequestInput struct {
 	LocationName *string  `json:"location_name"`
 	Latitude     *float64 `json:"latitude"`
 	Longitude    *float64 `json:"longitude"`
+	// Payment receiving details
+	TargetAmount            *float64 `json:"target_amount"             validate:"omitempty,gt=0"`
+	PaymentType             *string  `json:"payment_type"              validate:"omitempty,oneof=bank mobile_money"`
+	BankAccountName         *string  `json:"bank_account_name"`
+	BankAccountNumber       *string  `json:"bank_account_number"`
+	BankName                *string  `json:"bank_name"`
+	ReceivingMobileProvider *string  `json:"receiving_mobile_provider" validate:"omitempty,oneof=mtn_momo airtel_money"`
+	ReceivingMobileNumber   *string  `json:"receiving_mobile_number"`
 }
 
 type RequestFilters struct {
@@ -88,6 +96,47 @@ func (input CreateRequestInput) ValidateBusinessRules() error {
 		input.BankName,
 		input.ReceivingMobileProvider,
 		input.ReceivingMobileNumber,
+	)
+}
+
+func (input UpdateRequestInput) ValidatePayoutBusinessRules(existing *EmergencyRequest) error {
+	// Merge: input fields take precedence over existing
+	targetAmount := existing.TargetAmount
+	if input.TargetAmount != nil {
+		targetAmount = input.TargetAmount
+	}
+	paymentType := existing.PaymentType
+	if input.PaymentType != nil {
+		paymentType = input.PaymentType
+	}
+	bankAccountName := existing.BankAccountName
+	if input.BankAccountName != nil {
+		bankAccountName = input.BankAccountName
+	}
+	bankAccountNumber := existing.BankAccountNumber
+	if input.BankAccountNumber != nil {
+		bankAccountNumber = input.BankAccountNumber
+	}
+	bankName := existing.BankName
+	if input.BankName != nil {
+		bankName = input.BankName
+	}
+	receivingMobileProvider := existing.ReceivingMobileProvider
+	if input.ReceivingMobileProvider != nil {
+		receivingMobileProvider = input.ReceivingMobileProvider
+	}
+	receivingMobileNumber := existing.ReceivingMobileNumber
+	if input.ReceivingMobileNumber != nil {
+		receivingMobileNumber = input.ReceivingMobileNumber
+	}
+	return validateFundingConfiguration(
+		targetAmount,
+		paymentType,
+		bankAccountName,
+		bankAccountNumber,
+		bankName,
+		receivingMobileProvider,
+		receivingMobileNumber,
 	)
 }
 

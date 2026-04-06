@@ -288,6 +288,41 @@ func (s *RequestService) UpdateRequest(ctx context.Context, id string, input mod
 		args = append(args, *input.Longitude)
 		argIdx++
 	}
+	if input.TargetAmount != nil {
+		setClauses = append(setClauses, fmt.Sprintf("target_amount = $%d", argIdx))
+		args = append(args, *input.TargetAmount)
+		argIdx++
+	}
+	if input.PaymentType != nil {
+		setClauses = append(setClauses, fmt.Sprintf("payment_type = $%d", argIdx))
+		args = append(args, *input.PaymentType)
+		argIdx++
+	}
+	if input.BankAccountName != nil {
+		setClauses = append(setClauses, fmt.Sprintf("bank_account_name = $%d", argIdx))
+		args = append(args, *input.BankAccountName)
+		argIdx++
+	}
+	if input.BankAccountNumber != nil {
+		setClauses = append(setClauses, fmt.Sprintf("bank_account_number = $%d", argIdx))
+		args = append(args, *input.BankAccountNumber)
+		argIdx++
+	}
+	if input.BankName != nil {
+		setClauses = append(setClauses, fmt.Sprintf("bank_name = $%d", argIdx))
+		args = append(args, *input.BankName)
+		argIdx++
+	}
+	if input.ReceivingMobileProvider != nil {
+		setClauses = append(setClauses, fmt.Sprintf("receiving_mobile_provider = $%d", argIdx))
+		args = append(args, *input.ReceivingMobileProvider)
+		argIdx++
+	}
+	if input.ReceivingMobileNumber != nil {
+		setClauses = append(setClauses, fmt.Sprintf("receiving_mobile_number = $%d", argIdx))
+		args = append(args, *input.ReceivingMobileNumber)
+		argIdx++
+	}
 
 	args = append(args, id)
 	query := fmt.Sprintf(

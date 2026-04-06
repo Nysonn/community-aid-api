@@ -207,6 +207,14 @@ func (h *RequestHandler) UpdateRequest(c *gin.Context) {
 		helpers.ErrorResponse(c, http.StatusBadRequest, "invalid request body")
 		return
 	}
+	if err := helpers.ValidateStruct(&input); err != nil {
+		helpers.ErrorResponse(c, http.StatusBadRequest, err.Error())
+		return
+	}
+	if err := input.ValidatePayoutBusinessRules(existing); err != nil {
+		helpers.ErrorResponse(c, http.StatusBadRequest, err.Error())
+		return
+	}
 
 	updated, err := h.service.UpdateRequest(c.Request.Context(), id, input)
 	if errors.Is(err, services.ErrNotFound) {
