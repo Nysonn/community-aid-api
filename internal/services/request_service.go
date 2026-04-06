@@ -20,15 +20,41 @@ func NewRequestService(db *sql.DB) *RequestService {
 	return &RequestService{db: db}
 }
 
-// scanRequest scans a single row into an EmergencyRequest.
+// scanRequest scans a single row into an EmergencyRequest (no poster_name column).
 func scanRequest(row interface{ Scan(...any) error }) (*models.EmergencyRequest, error) {
+	return scanRequestFromRow(row, false)
+}
+
+const selectCols = `id, user_id, title, description, type, status, location_name, latitude, longitude, media_urls,
+	target_amount, payment_type, bank_account_name, bank_account_number, bank_name,
+	receiving_mobile_provider, receiving_mobile_number,
+	COALESCE((SELECT SUM(amount) FROM donations WHERE request_id = emergency_requests.id), 0) AS amount_received,
+	created_at, updated_at`
+
+// selectColsAdmin adds the poster's full name via a LEFT JOIN with users.
+const selectColsAdmin = `er.id, er.user_id, er.title, er.description, er.type, er.status,
+	er.location_name, er.latitude, er.longitude, er.media_urls,
+	er.target_amount, er.payment_type, er.bank_account_name, er.bank_account_number, er.bank_name,
+	er.receiving_mobile_provider, er.receiving_mobile_number,
+	COALESCE((SELECT SUM(amount) FROM donations WHERE request_id = er.id), 0) AS amount_received,
+	er.created_at, er.updated_at,
+	COALESCE(u.full_name, '') AS poster_name`
+
+func scanRequestWithPoster(row interface{ Scan(...any) error }) (*models.EmergencyRequest, error) {
+	r, err := scanRequestFromRow(row, true)
+	return r, err
+}
+
+// scanRequestFromRow is the shared scanner; withPoster controls whether it reads the extra poster_name column.
+func scanRequestFromRow(row interface{ Scan(...any) error }, withPoster bool) (*models.EmergencyRequest, error) {
 	var r models.EmergencyRequest
 	var targetAmount sql.NullFloat64
 	var paymentType sql.NullString
 	var bankAccountName, bankAccountNumber, bankName sql.NullString
 	var receivingMobileProvider, receivingMobileNumber sql.NullString
 	var lat, lng sql.NullFloat64
-	err := row.Scan(
+
+	dest := []any{
 		&r.ID, &r.UserID, &r.Title, &r.Description, &r.Type, &r.Status,
 		&r.LocationName, &lat, &lng, &r.MediaURLs,
 		&targetAmount,
@@ -36,8 +62,12 @@ func scanRequest(row interface{ Scan(...any) error }) (*models.EmergencyRequest,
 		&receivingMobileProvider, &receivingMobileNumber,
 		&r.AmountReceived,
 		&r.CreatedAt, &r.UpdatedAt,
-	)
-	if err != nil {
+	}
+	if withPoster {
+		dest = append(dest, &r.PosterName)
+	}
+
+	if err := row.Scan(dest...); err != nil {
 		return nil, err
 	}
 	if lat.Valid {
@@ -69,12 +99,6 @@ func scanRequest(row interface{ Scan(...any) error }) (*models.EmergencyRequest,
 	}
 	return &r, nil
 }
-
-const selectCols = `id, user_id, title, description, type, status, location_name, latitude, longitude, media_urls,
-	target_amount, payment_type, bank_account_name, bank_account_number, bank_name,
-	receiving_mobile_provider, receiving_mobile_number,
-	COALESCE((SELECT SUM(amount) FROM donations WHERE request_id = emergency_requests.id), 0) AS amount_received,
-	created_at, updated_at`
 
 func (s *RequestService) CreateRequest(ctx context.Context, userID string, input models.CreateRequestInput, mediaURLs []string) (*models.EmergencyRequest, error) {
 	if mediaURLs == nil {
@@ -146,29 +170,29 @@ func (s *RequestService) GetAllRequests(ctx context.Context, filters models.Requ
 	return results, total, nil
 }
 
-// GetAllRequestsAdmin returns all requests regardless of status, paginated.
+// GetAllRequestsAdmin returns all requests regardless of status, paginated, with poster name.
 func (s *RequestService) GetAllRequestsAdmin(ctx context.Context, filters models.RequestFilters, page, pageSize int) ([]models.EmergencyRequest, int, error) {
 	args := []interface{}{}
 	argIdx := 1
 	conditions := []string{}
 
 	if filters.Status != nil {
-		conditions = append(conditions, fmt.Sprintf("status = $%d", argIdx))
+		conditions = append(conditions, fmt.Sprintf("er.status = $%d", argIdx))
 		args = append(args, *filters.Status)
 		argIdx++
 	}
 	if filters.Type != nil {
-		conditions = append(conditions, fmt.Sprintf("type = $%d", argIdx))
+		conditions = append(conditions, fmt.Sprintf("er.type = $%d", argIdx))
 		args = append(args, *filters.Type)
 		argIdx++
 	}
 	if filters.LocationName != nil {
-		conditions = append(conditions, fmt.Sprintf("location_name ILIKE $%d", argIdx))
+		conditions = append(conditions, fmt.Sprintf("er.location_name ILIKE $%d", argIdx))
 		args = append(args, "%"+*filters.LocationName+"%")
 		argIdx++
 	}
 
-	baseQuery := `FROM emergency_requests`
+	baseQuery := `FROM emergency_requests er LEFT JOIN users u ON u.id = er.user_id`
 	if len(conditions) > 0 {
 		baseQuery += " WHERE " + strings.Join(conditions, " AND ")
 	}
@@ -181,12 +205,29 @@ func (s *RequestService) GetAllRequestsAdmin(ctx context.Context, filters models
 	offset := (page - 1) * pageSize
 	dataArgs := append(append([]interface{}{}, args...), pageSize, offset)
 	dataQuery := fmt.Sprintf(
-		`SELECT `+selectCols+` `+baseQuery+` ORDER BY created_at DESC LIMIT $%d OFFSET $%d`,
+		`SELECT `+selectColsAdmin+` `+baseQuery+` ORDER BY er.created_at DESC LIMIT $%d OFFSET $%d`,
 		argIdx, argIdx+1,
 	)
-	results, err := s.queryRequests(ctx, dataQuery, dataArgs...)
+
+	rows, err := s.db.QueryContext(ctx, dataQuery, dataArgs...)
 	if err != nil {
-		return nil, 0, err
+		return nil, 0, fmt.Errorf("query admin requests: %w", err)
+	}
+	defer rows.Close()
+
+	var results []models.EmergencyRequest
+	for rows.Next() {
+		r, err := scanRequestWithPoster(rows)
+		if err != nil {
+			return nil, 0, fmt.Errorf("scan admin request: %w", err)
+		}
+		results = append(results, *r)
+	}
+	if err := rows.Err(); err != nil {
+		return nil, 0, fmt.Errorf("rows error: %w", err)
+	}
+	if results == nil {
+		results = []models.EmergencyRequest{}
 	}
 	return results, total, nil
 }

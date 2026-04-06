@@ -27,8 +27,9 @@ type EmergencyRequest struct {
 	BankName                 *string `json:"bank_name"`
 	ReceivingMobileProvider  *string `json:"receiving_mobile_provider"`
 	ReceivingMobileNumber    *string `json:"receiving_mobile_number"`
-	CreatedAt time.Time `json:"created_at"`
-	UpdatedAt time.Time `json:"updated_at"`
+	CreatedAt  time.Time `json:"created_at"`
+	UpdatedAt  time.Time `json:"updated_at"`
+	PosterName string    `json:"poster_name,omitempty"`
 }
 
 type CreateRequestInput struct {
