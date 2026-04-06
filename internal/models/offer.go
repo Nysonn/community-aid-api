@@ -208,3 +208,7 @@ func isValidCardCVC(value string) bool {
 func digitsOnly(value string) string {
 	return digitsOnlyRegex.ReplaceAllString(value, "")
 }
+
+func normalizeWhitespace(value string) string {
+	return strings.Join(strings.Fields(strings.TrimSpace(value)), " ")
+}

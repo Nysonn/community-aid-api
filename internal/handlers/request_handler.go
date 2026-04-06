@@ -48,6 +48,29 @@ func (h *RequestHandler) CreateRequest(c *gin.Context) {
 		Type:         c.PostForm("type"),
 		LocationName: c.PostForm("location_name"),
 	}
+	if v := c.PostForm("target_amount"); v != "" {
+		if amount, err := strconv.ParseFloat(v, 64); err == nil {
+			input.TargetAmount = &amount
+		}
+	}
+	if v := c.PostForm("payment_type"); v != "" {
+		input.PaymentType = &v
+	}
+	if v := c.PostForm("bank_account_name"); v != "" {
+		input.BankAccountName = &v
+	}
+	if v := c.PostForm("bank_account_number"); v != "" {
+		input.BankAccountNumber = &v
+	}
+	if v := c.PostForm("bank_name"); v != "" {
+		input.BankName = &v
+	}
+	if v := c.PostForm("receiving_mobile_provider"); v != "" {
+		input.ReceivingMobileProvider = &v
+	}
+	if v := c.PostForm("receiving_mobile_number"); v != "" {
+		input.ReceivingMobileNumber = &v
+	}
 	if v := c.PostForm("latitude"); v != "" {
 		if lat, err := strconv.ParseFloat(v, 64); err == nil {
 			input.Latitude = &lat
@@ -59,7 +82,13 @@ func (h *RequestHandler) CreateRequest(c *gin.Context) {
 		}
 	}
 
+	input.Normalize()
+
 	if err := helpers.ValidateStruct(&input); err != nil {
+		helpers.ErrorResponse(c, http.StatusBadRequest, err.Error())
+		return
+	}
+	if err := input.ValidateBusinessRules(); err != nil {
 		helpers.ErrorResponse(c, http.StatusBadRequest, err.Error())
 		return
 	}
@@ -212,6 +241,21 @@ func (h *RequestHandler) DeleteRequest(c *gin.Context) {
 func (h *RequestHandler) ApproveRequest(c *gin.Context) {
 	id := c.Param("id")
 	status := "approved"
+
+	existing, err := h.service.GetRequestByID(c.Request.Context(), id)
+	if errors.Is(err, services.ErrNotFound) {
+		helpers.ErrorResponse(c, http.StatusNotFound, "request not found")
+		return
+	}
+	if err != nil {
+		log.Printf("ERROR ApproveRequest fetch %s: %v", id, err)
+		helpers.ErrorResponse(c, http.StatusInternalServerError, "an unexpected error occurred")
+		return
+	}
+	if err := existing.ValidateBusinessRules(); err != nil {
+		helpers.ErrorResponse(c, http.StatusBadRequest, err.Error())
+		return
+	}
 
 	updated, err := h.service.UpdateRequest(c.Request.Context(), id, models.UpdateRequestInput{Status: &status})
 	if errors.Is(err, services.ErrNotFound) {

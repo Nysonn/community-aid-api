@@ -202,17 +202,17 @@ func validateDonationDisbursementDetails(req *models.EmergencyRequest) error {
 	}
 
 	if req.PaymentType == nil {
-		return &BadRequestError{Message: "this request is not configured to receive donations"}
+		return &BadRequestError{Message: "this request cannot receive donations yet because payout details were not set"}
 	}
 
 	switch strings.TrimSpace(*req.PaymentType) {
 	case "bank":
 		if isBlankStringPtr(req.BankAccountName) || isBlankStringPtr(req.BankAccountNumber) || isBlankStringPtr(req.BankName) {
-			return &BadRequestError{Message: "this request is missing bank disbursement details"}
+			return &BadRequestError{Message: "this request cannot receive donations yet because its bank payout details are incomplete"}
 		}
 	case "mobile_money":
 		if isBlankStringPtr(req.ReceivingMobileProvider) || isBlankStringPtr(req.ReceivingMobileNumber) {
-			return &BadRequestError{Message: "this request is missing mobile money disbursement details"}
+			return &BadRequestError{Message: "this request cannot receive donations yet because its mobile money payout details are incomplete"}
 		}
 	default:
 		return &BadRequestError{Message: "this request has an invalid payment configuration"}
