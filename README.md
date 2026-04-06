@@ -254,4 +254,4 @@ should be replaced with a Redis-backed solution.
 
 **CORS.** In development, leave `ALLOWED_ORIGINS` empty to allow all origins. In
 production, set it to a comma-separated list of your frontend origins, for example
-`https://app.communityaid.com`.
+`https://app.communityaid.me`.

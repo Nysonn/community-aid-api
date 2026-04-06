@@ -1,6 +1,7 @@
 package handlers
 
 import (
+	"context"
 	"database/sql"
 	"log"
 	"net/http"
@@ -13,11 +14,13 @@ import (
 )
 
 type AdminHandler struct {
-	userSvc     *services.UserService
-	requestSvc  *services.RequestService
-	offerSvc    *services.OfferService
-	donationSvc *services.DonationService
-	db          *sql.DB
+	userSvc         *services.UserService
+	requestSvc      *services.RequestService
+	offerSvc        *services.OfferService
+	donationSvc     *services.DonationService
+	disbursementSvc *services.DisbursementService
+	emailSvc        *services.EmailService
+	db              *sql.DB
 }
 
 func NewAdminHandler(
@@ -25,14 +28,18 @@ func NewAdminHandler(
 	requestSvc *services.RequestService,
 	offerSvc *services.OfferService,
 	donationSvc *services.DonationService,
+	disbursementSvc *services.DisbursementService,
+	emailSvc *services.EmailService,
 	db *sql.DB,
 ) *AdminHandler {
 	return &AdminHandler{
-		userSvc:     userSvc,
-		requestSvc:  requestSvc,
-		offerSvc:    offerSvc,
-		donationSvc: donationSvc,
-		db:          db,
+		userSvc:         userSvc,
+		requestSvc:      requestSvc,
+		offerSvc:        offerSvc,
+		donationSvc:     donationSvc,
+		disbursementSvc: disbursementSvc,
+		emailSvc:        emailSvc,
+		db:              db,
 	}
 }
 
@@ -112,4 +119,98 @@ func (h *AdminHandler) GetAllRequestsAdmin(c *gin.Context) {
 	}
 
 	helpers.PaginatedResponse(c, http.StatusOK, requests, total, page, pageSize)
+}
+
+// GetDisbursements returns all disbursements, optionally filtered by status=pending|disbursed.
+func (h *AdminHandler) GetDisbursements(c *gin.Context) {
+	status := c.Query("status")
+	page, pageSize := helpers.ParsePagination(c)
+
+	disbursements, total, err := h.disbursementSvc.GetAllDisbursements(c.Request.Context(), status, page, pageSize)
+	if err != nil {
+		log.Printf("ERROR GetDisbursements: %v", err)
+		helpers.ErrorResponse(c, http.StatusInternalServerError, "an unexpected error occurred")
+		return
+	}
+
+	helpers.PaginatedResponse(c, http.StatusOK, disbursements, total, page, pageSize)
+}
+
+// MarkDisbursed marks a disbursement as sent and triggers emails to both donor and request owner.
+func (h *AdminHandler) MarkDisbursed(c *gin.Context) {
+	id := c.Param("id")
+
+	d, err := h.disbursementSvc.MarkDisbursed(c.Request.Context(), id)
+	if err == services.ErrNotFound {
+		helpers.ErrorResponse(c, http.StatusNotFound, "disbursement not found")
+		return
+	}
+	if err != nil {
+		log.Printf("ERROR MarkDisbursed %s: %v", id, err)
+		helpers.ErrorResponse(c, http.StatusInternalServerError, "an unexpected error occurred")
+		return
+	}
+
+	// Fire-and-forget emails
+	go h.sendDisbursementEmails(d)
+
+	helpers.SuccessResponse(c, http.StatusOK, d)
+}
+
+func (h *AdminHandler) sendDisbursementEmails(d *models.Disbursement) {
+	// Email to donor: funds delivered to recipient
+	if err := h.emailSvc.SendDonorFundsDeliveredEmail(
+		d.DonorEmail, d.RequestTitle, d.RecipientName, d.Amount,
+	); err != nil {
+		log.Printf("warn: failed to email donor %s: %v", d.DonorEmail, err)
+	}
+
+	// Email to request owner: funds sent to their account
+	var ownerEmail string
+	if err := h.db.QueryRowContext(context.Background(),
+		`SELECT email FROM users WHERE id = (SELECT user_id FROM emergency_requests WHERE id = $1)`,
+		d.RequestID,
+	).Scan(&ownerEmail); err != nil {
+		log.Printf("warn: could not fetch owner email for request %s: %v", d.RequestID, err)
+		return
+	}
+	if err := h.emailSvc.SendFundsDisbursedToRecipientEmail(ownerEmail, d.RequestTitle, d.Amount); err != nil {
+		log.Printf("warn: failed to email request owner %s: %v", ownerEmail, err)
+	}
+}
+
+// PromoteToAdmin promotes a community_member to admin role.
+func (h *AdminHandler) PromoteToAdmin(c *gin.Context) {
+	id := c.Param("id")
+
+	user, err := h.userSvc.SetUserRole(c.Request.Context(), id, "admin")
+	if err == services.ErrNotFound {
+		helpers.ErrorResponse(c, http.StatusNotFound, "user not found")
+		return
+	}
+	if err != nil {
+		log.Printf("ERROR PromoteToAdmin %s: %v", id, err)
+		helpers.ErrorResponse(c, http.StatusInternalServerError, "an unexpected error occurred")
+		return
+	}
+
+	helpers.SuccessResponse(c, http.StatusOK, user)
+}
+
+// DemoteFromAdmin demotes an admin back to community_member.
+func (h *AdminHandler) DemoteFromAdmin(c *gin.Context) {
+	id := c.Param("id")
+
+	user, err := h.userSvc.SetUserRole(c.Request.Context(), id, "community_member")
+	if err == services.ErrNotFound {
+		helpers.ErrorResponse(c, http.StatusNotFound, "user not found")
+		return
+	}
+	if err != nil {
+		log.Printf("ERROR DemoteFromAdmin %s: %v", id, err)
+		helpers.ErrorResponse(c, http.StatusInternalServerError, "an unexpected error occurred")
+		return
+	}
+
+	helpers.SuccessResponse(c, http.StatusOK, user)
 }

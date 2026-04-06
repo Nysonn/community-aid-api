@@ -37,6 +37,7 @@ func main() {
 	emailSvc := services.NewEmailService(mailer)
 	offerSvc := services.NewOfferService(database)
 	donationSvc := services.NewDonationService(database)
+	disbursementSvc := services.NewDisbursementService(database)
 
 	router := gin.Default()
 	router.HandleMethodNotAllowed = false
@@ -44,7 +45,7 @@ func main() {
 	router.Use(middleware.RateLimit())
 	router.Use(middleware.CORS(cfg.AllowedOrigins))
 
-	routes.SetupRoutes(router, database, cld, mailer, userSvc, requestSvc, emailSvc, offerSvc, donationSvc, cfg.AppEnv)
+	routes.SetupRoutes(router, database, cld, mailer, userSvc, requestSvc, emailSvc, offerSvc, donationSvc, disbursementSvc, cfg.AppEnv)
 
 	addr := fmt.Sprintf(":%s", cfg.Port)
 	srv := &http.Server{

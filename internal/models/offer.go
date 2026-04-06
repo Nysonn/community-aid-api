@@ -18,6 +18,7 @@ type Offer struct {
 	ExpertiseDetails        *string   `json:"expertise_details,omitempty"`
 	VehicleType             *string   `json:"vehicle_type,omitempty"`
 	DonationAmount          *float64  `json:"donation_amount,omitempty"`
+	DonorEmail              *string   `json:"donor_email,omitempty"`
 	PaymentMethod           *string   `json:"payment_method,omitempty"`
 	MobileMoneyProvider     *string   `json:"mobile_money_provider,omitempty"`
 	MobileMoneyNumberMasked *string   `json:"mobile_money_number_masked,omitempty"`
@@ -39,6 +40,7 @@ type CreateOfferInput struct {
 	ExpertiseDetails    *string  `json:"expertise_details,omitempty"`
 	VehicleType         *string  `json:"vehicle_type,omitempty"`
 	DonationAmount      *float64 `json:"donation_amount,omitempty" validate:"omitempty,gt=0"`
+	DonorEmail          *string  `json:"donor_email,omitempty"`
 	PaymentMethod       *string  `json:"payment_method,omitempty" validate:"omitempty,oneof=mobile_money visa"`
 	MobileMoneyProvider *string  `json:"mobile_money_provider,omitempty" validate:"omitempty,oneof=airtel_money mtn_momo"`
 	MobileMoneyNumber   *string  `json:"mobile_money_number,omitempty"`
@@ -63,6 +65,7 @@ func (input *CreateOfferInput) Normalize() {
 	input.ResponderContact = strings.TrimSpace(input.ResponderContact)
 	trimStringPtr(&input.ExpertiseDetails)
 	trimStringPtr(&input.VehicleType)
+	trimStringPtr(&input.DonorEmail)
 	trimStringPtr(&input.PaymentMethod)
 	trimStringPtr(&input.MobileMoneyProvider)
 	trimStringPtr(&input.MobileMoneyNumber)
@@ -88,6 +91,12 @@ func (input *CreateOfferInput) ValidateBusinessRules() error {
 	case "donation":
 		if input.DonationAmount == nil || *input.DonationAmount <= 0 {
 			return fmt.Errorf("donation_amount is required when offer_type is donation")
+		}
+		if isBlankPtr(input.DonorEmail) {
+			return fmt.Errorf("donor_email is required when offer_type is donation")
+		}
+		if !isValidEmail(*input.DonorEmail) {
+			return fmt.Errorf("donor_email must be a valid email address")
 		}
 		if input.PaymentMethod == nil {
 			return fmt.Errorf("payment_method is required when offer_type is donation")

@@ -23,15 +23,58 @@ func NewRequestService(db *sql.DB) *RequestService {
 // scanRequest scans a single row into an EmergencyRequest.
 func scanRequest(row interface{ Scan(...any) error }) (*models.EmergencyRequest, error) {
 	var r models.EmergencyRequest
+	var targetAmount sql.NullFloat64
+	var paymentType sql.NullString
+	var bankAccountName, bankAccountNumber, bankName sql.NullString
+	var receivingMobileProvider, receivingMobileNumber sql.NullString
+	var lat, lng sql.NullFloat64
 	err := row.Scan(
 		&r.ID, &r.UserID, &r.Title, &r.Description, &r.Type, &r.Status,
-		&r.LocationName, &r.Latitude, &r.Longitude, &r.MediaURLs,
+		&r.LocationName, &lat, &lng, &r.MediaURLs,
+		&targetAmount,
+		&paymentType, &bankAccountName, &bankAccountNumber, &bankName,
+		&receivingMobileProvider, &receivingMobileNumber,
+		&r.AmountReceived,
 		&r.CreatedAt, &r.UpdatedAt,
 	)
-	return &r, err
+	if err != nil {
+		return nil, err
+	}
+	if lat.Valid {
+		r.Latitude = &lat.Float64
+	}
+	if lng.Valid {
+		r.Longitude = &lng.Float64
+	}
+	if targetAmount.Valid {
+		r.TargetAmount = &targetAmount.Float64
+	}
+	if paymentType.Valid {
+		r.PaymentType = &paymentType.String
+	}
+	if bankAccountName.Valid {
+		r.BankAccountName = &bankAccountName.String
+	}
+	if bankAccountNumber.Valid {
+		r.BankAccountNumber = &bankAccountNumber.String
+	}
+	if bankName.Valid {
+		r.BankName = &bankName.String
+	}
+	if receivingMobileProvider.Valid {
+		r.ReceivingMobileProvider = &receivingMobileProvider.String
+	}
+	if receivingMobileNumber.Valid {
+		r.ReceivingMobileNumber = &receivingMobileNumber.String
+	}
+	return &r, nil
 }
 
-const selectCols = `id, user_id, title, description, type, status, location_name, latitude, longitude, media_urls, created_at, updated_at`
+const selectCols = `id, user_id, title, description, type, status, location_name, latitude, longitude, media_urls,
+	target_amount, payment_type, bank_account_name, bank_account_number, bank_name,
+	receiving_mobile_provider, receiving_mobile_number,
+	COALESCE((SELECT SUM(amount) FROM donations WHERE request_id = emergency_requests.id), 0) AS amount_received,
+	created_at, updated_at`
 
 func (s *RequestService) CreateRequest(ctx context.Context, userID string, input models.CreateRequestInput, mediaURLs []string) (*models.EmergencyRequest, error) {
 	if mediaURLs == nil {
@@ -39,11 +82,16 @@ func (s *RequestService) CreateRequest(ctx context.Context, userID string, input
 	}
 	row := s.db.QueryRowContext(ctx,
 		`INSERT INTO emergency_requests
-			(user_id, title, description, type, status, location_name, latitude, longitude, media_urls)
-		 VALUES ($1, $2, $3, $4, 'pending', $5, $6, $7, $8)
+			(user_id, title, description, type, status, location_name, latitude, longitude, media_urls,
+			 target_amount, payment_type, bank_account_name, bank_account_number, bank_name,
+			 receiving_mobile_provider, receiving_mobile_number)
+		 VALUES ($1, $2, $3, $4, 'pending', $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15)
 		 RETURNING `+selectCols,
 		userID, input.Title, input.Description, input.Type,
 		input.LocationName, input.Latitude, input.Longitude, pq.Array(mediaURLs),
+		input.TargetAmount, input.PaymentType,
+		input.BankAccountName, input.BankAccountNumber, input.BankName,
+		input.ReceivingMobileProvider, input.ReceivingMobileNumber,
 	)
 	r, err := scanRequest(row)
 	if err != nil {

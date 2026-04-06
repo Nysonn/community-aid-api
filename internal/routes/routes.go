@@ -23,6 +23,7 @@ func SetupRoutes(
 	emailSvc *services.EmailService,
 	offerSvc *services.OfferService,
 	donationSvc *services.DonationService,
+	disbursementSvc *services.DisbursementService,
 	appEnv string,
 ) {
 	authHandler := handlers.NewAuthHandler(userSvc)
@@ -30,7 +31,7 @@ func SetupRoutes(
 	requestHandler := handlers.NewRequestHandler(requestSvc, emailSvc, cld, db)
 	offerHandler := handlers.NewOfferHandler(offerSvc, requestSvc, emailSvc, db)
 	donationHandler := handlers.NewDonationHandler(donationSvc)
-	adminHandler := handlers.NewAdminHandler(userSvc, requestSvc, offerSvc, donationSvc, db)
+	adminHandler := handlers.NewAdminHandler(userSvc, requestSvc, offerSvc, donationSvc, disbursementSvc, emailSvc, db)
 
 	v1 := router.Group("/api/v1")
 
@@ -81,8 +82,13 @@ func SetupRoutes(
 		adminRoutes.GET("/admin/users", userHandler.GetAllUsers)
 		adminRoutes.PUT("/admin/users/:id/activate", userHandler.ActivateUser)
 		adminRoutes.PUT("/admin/users/:id/deactivate", userHandler.DeactivateUser)
+		adminRoutes.PUT("/admin/users/:id/promote", adminHandler.PromoteToAdmin)
+		adminRoutes.PUT("/admin/users/:id/demote", adminHandler.DemoteFromAdmin)
 
 		adminRoutes.GET("/admin/stats", adminHandler.GetDashboardStats)
 		adminRoutes.GET("/admin/requests", adminHandler.GetAllRequestsAdmin)
+
+		adminRoutes.GET("/admin/disbursements", adminHandler.GetDisbursements)
+		adminRoutes.POST("/admin/disbursements/:id/disburse", adminHandler.MarkDisbursed)
 	}
 }

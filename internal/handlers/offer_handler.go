@@ -63,7 +63,15 @@ func (h *OfferHandler) CreateOffer(c *gin.Context) {
 		return
 	}
 
-	offer, err := h.offerSvc.CreateOffer(c.Request.Context(), input)
+	// Fetch request owner's full name for the disbursement recipient label.
+	var recipientName string
+	if err2 := h.db.QueryRowContext(c.Request.Context(),
+		`SELECT full_name FROM users WHERE id = $1`, req.UserID,
+	).Scan(&recipientName); err2 != nil {
+		recipientName = req.UserID // fallback to UUID if lookup fails
+	}
+
+	offer, err := h.offerSvc.CreateOffer(c.Request.Context(), input, req, recipientName)
 	if err != nil {
 		log.Printf("ERROR CreateOffer save: %v", err)
 		helpers.ErrorResponse(c, http.StatusInternalServerError, "an unexpected error occurred")

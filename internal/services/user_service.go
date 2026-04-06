@@ -186,6 +186,20 @@ func (s *UserService) SetUserActiveStatus(ctx context.Context, id string, isActi
 	return u, nil
 }
 
+func (s *UserService) SetUserRole(ctx context.Context, id, role string) (*models.User, error) {
+	u, err := scanUser(s.db.QueryRowContext(ctx,
+		`UPDATE users SET role = $1, updated_at = NOW() WHERE id = $2 RETURNING `+userCols,
+		role, id,
+	))
+	if errors.Is(err, sql.ErrNoRows) {
+		return nil, ErrNotFound
+	}
+	if err != nil {
+		return nil, fmt.Errorf("set user role: %w", err)
+	}
+	return u, nil
+}
+
 func (s *UserService) UploadUserAvatar(ctx context.Context, id, imageURL string) (*models.User, error) {
 	u, err := scanUser(s.db.QueryRowContext(ctx,
 		`UPDATE users SET profile_image_url = $1, updated_at = NOW() WHERE id = $2 RETURNING `+userCols,

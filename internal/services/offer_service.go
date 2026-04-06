@@ -19,7 +19,7 @@ func NewOfferService(db *sql.DB) *OfferService {
 }
 
 const offerCols = `id, request_id, responder_name, responder_contact, offer_type, status,
-	expertise_details, vehicle_type, donation_amount, payment_method, mobile_money_provider,
+	expertise_details, vehicle_type, donation_amount, donor_email, payment_method, mobile_money_provider,
 	mobile_money_number_masked, card_last4, card_expiry_month, card_expiry_year, cardholder_name,
 	latitude, longitude, created_at, updated_at`
 
@@ -28,6 +28,7 @@ func scanOffer(row interface{ Scan(...any) error }) (*models.Offer, error) {
 	var expertiseDetails sql.NullString
 	var vehicleType sql.NullString
 	var donationAmount sql.NullFloat64
+	var donorEmail sql.NullString
 	var paymentMethod sql.NullString
 	var mobileMoneyProvider sql.NullString
 	var mobileMoneyNumberMasked sql.NullString
@@ -40,7 +41,7 @@ func scanOffer(row interface{ Scan(...any) error }) (*models.Offer, error) {
 	err := row.Scan(
 		&o.ID, &o.RequestID, &o.ResponderName, &o.ResponderContact,
 		&o.OfferType, &o.Status,
-		&expertiseDetails, &vehicleType, &donationAmount, &paymentMethod, &mobileMoneyProvider,
+		&expertiseDetails, &vehicleType, &donationAmount, &donorEmail, &paymentMethod, &mobileMoneyProvider,
 		&mobileMoneyNumberMasked, &cardLast4, &cardExpiryMonth, &cardExpiryYear, &cardholderName,
 		&latitude, &longitude,
 		&o.CreatedAt, &o.UpdatedAt,
@@ -56,6 +57,9 @@ func scanOffer(row interface{ Scan(...any) error }) (*models.Offer, error) {
 	}
 	if donationAmount.Valid {
 		o.DonationAmount = &donationAmount.Float64
+	}
+	if donorEmail.Valid {
+		o.DonorEmail = &donorEmail.String
 	}
 	if paymentMethod.Valid {
 		o.PaymentMethod = &paymentMethod.String
@@ -89,29 +93,37 @@ func scanOffer(row interface{ Scan(...any) error }) (*models.Offer, error) {
 	return &o, err
 }
 
-func (s *OfferService) CreateOffer(ctx context.Context, input models.CreateOfferInput) (*models.Offer, error) {
+func (s *OfferService) CreateOffer(ctx context.Context, input models.CreateOfferInput, req *models.EmergencyRequest, recipientName string) (*models.Offer, error) {
 	tx, err := s.db.BeginTx(ctx, nil)
 	if err != nil {
 		return nil, fmt.Errorf("begin create offer tx: %w", err)
 	}
 	defer tx.Rollback()
 
+	// Donation offers are immediately accepted (money already sent to admin).
+	initialStatus := "pending"
+	if input.OfferType == "donation" {
+		initialStatus = "accepted"
+	}
+
 	row := tx.QueryRowContext(ctx,
 		`INSERT INTO offers (
 			request_id, responder_name, responder_contact, offer_type, status,
-			expertise_details, vehicle_type, donation_amount, payment_method, mobile_money_provider,
+			expertise_details, vehicle_type, donation_amount, donor_email, payment_method, mobile_money_provider,
 			mobile_money_number_masked, card_last4, card_expiry_month, card_expiry_year, cardholder_name,
 			latitude, longitude
 		)
-		 VALUES ($1, $2, $3, $4, 'pending', $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, $16)
+		 VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, $16, $17, $18)
 		 RETURNING `+offerCols,
 		input.RequestID,
 		input.ResponderName,
 		input.ResponderContact,
 		input.OfferType,
+		initialStatus,
 		input.ExpertiseDetails,
 		input.VehicleType,
 		input.DonationAmount,
+		input.DonorEmail,
 		input.PaymentMethod,
 		input.MobileMoneyProvider,
 		input.MaskedMobileMoneyNumber(),
@@ -128,6 +140,7 @@ func (s *OfferService) CreateOffer(ctx context.Context, input models.CreateOffer
 	}
 
 	if input.OfferType == "donation" && input.DonationAmount != nil {
+		// Record the donation
 		if _, err := tx.ExecContext(ctx,
 			`INSERT INTO donations (request_id, donor_name, amount, date)
 			 VALUES ($1, $2, $3, $4)`,
@@ -138,12 +151,42 @@ func (s *OfferService) CreateOffer(ctx context.Context, input models.CreateOffer
 		); err != nil {
 			return nil, fmt.Errorf("create linked donation: %w", err)
 		}
+
+		// Create a pending disbursement for the admin to process
+		donorEmail := ""
+		if input.DonorEmail != nil {
+			donorEmail = *input.DonorEmail
+		}
+		if _, err := tx.ExecContext(ctx,
+			`INSERT INTO disbursements (
+				offer_id, request_id, donor_name, donor_email, amount, recipient_name,
+				payment_type, bank_account_name, bank_account_number, bank_name,
+				receiving_mobile_provider, receiving_mobile_number
+			) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12)`,
+			o.ID, input.RequestID,
+			input.ResponderName, donorEmail, *input.DonationAmount, recipientName,
+			nullableStr(req.PaymentType),
+			nullableStr(req.BankAccountName),
+			nullableStr(req.BankAccountNumber),
+			nullableStr(req.BankName),
+			nullableStr(req.ReceivingMobileProvider),
+			nullableStr(req.ReceivingMobileNumber),
+		); err != nil {
+			return nil, fmt.Errorf("create disbursement: %w", err)
+		}
 	}
 
 	if err := tx.Commit(); err != nil {
 		return nil, fmt.Errorf("commit create offer: %w", err)
 	}
 	return o, nil
+}
+
+func nullableStr(s *string) interface{} {
+	if s == nil {
+		return nil
+	}
+	return *s
 }
 
 func (s *OfferService) GetOffersByRequestID(ctx context.Context, requestID string) ([]models.Offer, error) {
