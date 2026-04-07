@@ -68,6 +68,19 @@ type UpdateRequestInput struct {
 	ReceivingMobileNumber   *string  `json:"receiving_mobile_number"`
 }
 
+func (input *UpdateRequestInput) Normalize() {
+	trimStringPtr(&input.Title)
+	trimStringPtr(&input.Description)
+	trimStringPtr(&input.Status)
+	trimStringPtr(&input.LocationName)
+	trimStringPtr(&input.PaymentType)
+	trimStringPtr(&input.BankAccountName)
+	trimStringPtr(&input.BankAccountNumber)
+	trimStringPtr(&input.BankName)
+	trimStringPtr(&input.ReceivingMobileProvider)
+	trimStringPtr(&input.ReceivingMobileNumber)
+}
+
 type RequestFilters struct {
 	Type         *string `json:"type"`
 	Status       *string `json:"status"`

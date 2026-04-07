@@ -18,6 +18,136 @@ import (
 	"github.com/gin-gonic/gin"
 )
 
+type createRequestPayload struct {
+	Title                      string   `json:"title"`
+	Description                string   `json:"description"`
+	Type                       string   `json:"type"`
+	LocationName               *string  `json:"location_name"`
+	LocationNameAlt            *string  `json:"locationName"`
+	Latitude                   *float64 `json:"latitude"`
+	Longitude                  *float64 `json:"longitude"`
+	TargetAmount               *float64 `json:"target_amount"`
+	TargetAmountAlt            *float64 `json:"targetAmount"`
+	PaymentType                *string  `json:"payment_type"`
+	PaymentTypeAlt             *string  `json:"paymentType"`
+	BankAccountName            *string  `json:"bank_account_name"`
+	BankAccountNameAlt         *string  `json:"bankAccountName"`
+	BankAccountNumber          *string  `json:"bank_account_number"`
+	BankAccountNumberAlt       *string  `json:"bankAccountNumber"`
+	BankName                   *string  `json:"bank_name"`
+	BankNameAlt                *string  `json:"bankName"`
+	ReceivingMobileProvider    *string  `json:"receiving_mobile_provider"`
+	ReceivingMobileProviderAlt *string  `json:"receivingMobileProvider"`
+	ReceivingMobileNumber      *string  `json:"receiving_mobile_number"`
+	ReceivingMobileNumberAlt   *string  `json:"receivingMobileNumber"`
+}
+
+func (p createRequestPayload) toInput() models.CreateRequestInput {
+	return models.CreateRequestInput{
+		Title:                   p.Title,
+		Description:             p.Description,
+		Type:                    p.Type,
+		LocationName:            firstStringValue(p.LocationName, p.LocationNameAlt),
+		Latitude:                p.Latitude,
+		Longitude:               p.Longitude,
+		TargetAmount:            firstFloatValue(p.TargetAmount, p.TargetAmountAlt),
+		PaymentType:             firstStringPtr(p.PaymentType, p.PaymentTypeAlt),
+		BankAccountName:         firstStringPtr(p.BankAccountName, p.BankAccountNameAlt),
+		BankAccountNumber:       firstStringPtr(p.BankAccountNumber, p.BankAccountNumberAlt),
+		BankName:                firstStringPtr(p.BankName, p.BankNameAlt),
+		ReceivingMobileProvider: firstStringPtr(p.ReceivingMobileProvider, p.ReceivingMobileProviderAlt),
+		ReceivingMobileNumber:   firstStringPtr(p.ReceivingMobileNumber, p.ReceivingMobileNumberAlt),
+	}
+}
+
+type updateRequestPayload struct {
+	Title                      *string  `json:"title"`
+	Description                *string  `json:"description"`
+	Status                     *string  `json:"status"`
+	LocationName               *string  `json:"location_name"`
+	LocationNameAlt            *string  `json:"locationName"`
+	Latitude                   *float64 `json:"latitude"`
+	Longitude                  *float64 `json:"longitude"`
+	TargetAmount               *float64 `json:"target_amount"`
+	TargetAmountAlt            *float64 `json:"targetAmount"`
+	PaymentType                *string  `json:"payment_type"`
+	PaymentTypeAlt             *string  `json:"paymentType"`
+	BankAccountName            *string  `json:"bank_account_name"`
+	BankAccountNameAlt         *string  `json:"bankAccountName"`
+	BankAccountNumber          *string  `json:"bank_account_number"`
+	BankAccountNumberAlt       *string  `json:"bankAccountNumber"`
+	BankName                   *string  `json:"bank_name"`
+	BankNameAlt                *string  `json:"bankName"`
+	ReceivingMobileProvider    *string  `json:"receiving_mobile_provider"`
+	ReceivingMobileProviderAlt *string  `json:"receivingMobileProvider"`
+	ReceivingMobileNumber      *string  `json:"receiving_mobile_number"`
+	ReceivingMobileNumberAlt   *string  `json:"receivingMobileNumber"`
+}
+
+func (p updateRequestPayload) toInput() models.UpdateRequestInput {
+	return models.UpdateRequestInput{
+		Title:                   p.Title,
+		Description:             p.Description,
+		Status:                  p.Status,
+		LocationName:            firstStringPtr(p.LocationName, p.LocationNameAlt),
+		Latitude:                p.Latitude,
+		Longitude:               p.Longitude,
+		TargetAmount:            firstFloatValue(p.TargetAmount, p.TargetAmountAlt),
+		PaymentType:             firstStringPtr(p.PaymentType, p.PaymentTypeAlt),
+		BankAccountName:         firstStringPtr(p.BankAccountName, p.BankAccountNameAlt),
+		BankAccountNumber:       firstStringPtr(p.BankAccountNumber, p.BankAccountNumberAlt),
+		BankName:                firstStringPtr(p.BankName, p.BankNameAlt),
+		ReceivingMobileProvider: firstStringPtr(p.ReceivingMobileProvider, p.ReceivingMobileProviderAlt),
+		ReceivingMobileNumber:   firstStringPtr(p.ReceivingMobileNumber, p.ReceivingMobileNumberAlt),
+	}
+}
+
+func firstStringValue(values ...*string) string {
+	if value := firstStringPtr(values...); value != nil {
+		return *value
+	}
+	return ""
+}
+
+func firstStringPtr(values ...*string) *string {
+	for _, value := range values {
+		if value != nil {
+			return value
+		}
+	}
+	return nil
+}
+
+func firstFloatValue(values ...*float64) *float64 {
+	for _, value := range values {
+		if value != nil {
+			return value
+		}
+	}
+	return nil
+}
+
+func formValue(c *gin.Context, keys ...string) string {
+	for _, key := range keys {
+		if value := c.PostForm(key); value != "" {
+			return value
+		}
+	}
+	return ""
+}
+
+func parseOptionalFormFloat(c *gin.Context, keys ...string) *float64 {
+	value := formValue(c, keys...)
+	if value == "" {
+		return nil
+	}
+	parsed, err := strconv.ParseFloat(value, 64)
+	if err != nil {
+		return nil
+	}
+	return &parsed
+}
+
 type RequestHandler struct {
 	service  *services.RequestService
 	emailSvc *services.EmailService
@@ -37,48 +167,39 @@ func NewRequestHandler(
 func (h *RequestHandler) CreateRequest(c *gin.Context) {
 	userID := c.GetString(middleware.ContextKeyUserID)
 
-	if err := c.Request.ParseMultipartForm(32 << 20); err != nil {
-		helpers.ErrorResponse(c, http.StatusBadRequest, "failed to parse form data")
-		return
-	}
+	var input models.CreateRequestInput
+	if c.ContentType() == "application/json" {
+		var payload createRequestPayload
+		if err := c.ShouldBindJSON(&payload); err != nil {
+			helpers.ErrorResponse(c, http.StatusBadRequest, "invalid request body")
+			return
+		}
+		input = payload.toInput()
+	} else {
+		if c.ContentType() == "multipart/form-data" {
+			if err := c.Request.ParseMultipartForm(32 << 20); err != nil {
+				helpers.ErrorResponse(c, http.StatusBadRequest, "failed to parse form data")
+				return
+			}
+		} else if err := c.Request.ParseForm(); err != nil {
+			helpers.ErrorResponse(c, http.StatusBadRequest, "failed to parse form data")
+			return
+		}
 
-	input := models.CreateRequestInput{
-		Title:        c.PostForm("title"),
-		Description:  c.PostForm("description"),
-		Type:         c.PostForm("type"),
-		LocationName: c.PostForm("location_name"),
-	}
-	if v := c.PostForm("target_amount"); v != "" {
-		if amount, err := strconv.ParseFloat(v, 64); err == nil {
-			input.TargetAmount = &amount
-		}
-	}
-	if v := c.PostForm("payment_type"); v != "" {
-		input.PaymentType = &v
-	}
-	if v := c.PostForm("bank_account_name"); v != "" {
-		input.BankAccountName = &v
-	}
-	if v := c.PostForm("bank_account_number"); v != "" {
-		input.BankAccountNumber = &v
-	}
-	if v := c.PostForm("bank_name"); v != "" {
-		input.BankName = &v
-	}
-	if v := c.PostForm("receiving_mobile_provider"); v != "" {
-		input.ReceivingMobileProvider = &v
-	}
-	if v := c.PostForm("receiving_mobile_number"); v != "" {
-		input.ReceivingMobileNumber = &v
-	}
-	if v := c.PostForm("latitude"); v != "" {
-		if lat, err := strconv.ParseFloat(v, 64); err == nil {
-			input.Latitude = &lat
-		}
-	}
-	if v := c.PostForm("longitude"); v != "" {
-		if lon, err := strconv.ParseFloat(v, 64); err == nil {
-			input.Longitude = &lon
+		input = models.CreateRequestInput{
+			Title:                   formValue(c, "title"),
+			Description:             formValue(c, "description"),
+			Type:                    formValue(c, "type"),
+			LocationName:            formValue(c, "location_name", "locationName"),
+			TargetAmount:            parseOptionalFormFloat(c, "target_amount", "targetAmount"),
+			PaymentType:             stringPtrFromForm(c, "payment_type", "paymentType"),
+			BankAccountName:         stringPtrFromForm(c, "bank_account_name", "bankAccountName"),
+			BankAccountNumber:       stringPtrFromForm(c, "bank_account_number", "bankAccountNumber"),
+			BankName:                stringPtrFromForm(c, "bank_name", "bankName"),
+			ReceivingMobileProvider: stringPtrFromForm(c, "receiving_mobile_provider", "receivingMobileProvider"),
+			ReceivingMobileNumber:   stringPtrFromForm(c, "receiving_mobile_number", "receivingMobileNumber"),
+			Latitude:                parseOptionalFormFloat(c, "latitude"),
+			Longitude:               parseOptionalFormFloat(c, "longitude"),
 		}
 	}
 
@@ -202,11 +323,13 @@ func (h *RequestHandler) UpdateRequest(c *gin.Context) {
 		return
 	}
 
-	var input models.UpdateRequestInput
-	if err := c.ShouldBindJSON(&input); err != nil {
+	var payload updateRequestPayload
+	if err := c.ShouldBindJSON(&payload); err != nil {
 		helpers.ErrorResponse(c, http.StatusBadRequest, "invalid request body")
 		return
 	}
+	input := payload.toInput()
+	input.Normalize()
 	if err := helpers.ValidateStruct(&input); err != nil {
 		helpers.ErrorResponse(c, http.StatusBadRequest, err.Error())
 		return
@@ -228,6 +351,14 @@ func (h *RequestHandler) UpdateRequest(c *gin.Context) {
 	}
 
 	helpers.SuccessResponse(c, http.StatusOK, updated)
+}
+
+func stringPtrFromForm(c *gin.Context, keys ...string) *string {
+	value := formValue(c, keys...)
+	if value == "" {
+		return nil
+	}
+	return &value
 }
 
 func (h *RequestHandler) DeleteRequest(c *gin.Context) {
