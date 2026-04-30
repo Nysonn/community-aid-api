@@ -30,13 +30,15 @@ type EmergencyRequest struct {
 	ReceivingMobileNumber   *string   `json:"receiving_mobile_number"`
 	CreatedAt               time.Time `json:"created_at"`
 	UpdatedAt               time.Time `json:"updated_at"`
-	PosterName              string    `json:"poster_name,omitempty"`
+	PosterName   string `json:"poster_name,omitempty"`
+	PosterPhone  string `json:"poster_phone,omitempty"`
+	PosterEmail  string `json:"poster_email,omitempty"`
 }
 
 type CreateRequestInput struct {
 	Title        string   `json:"title"         validate:"required"`
 	Description  string   `json:"description"   validate:"required"`
-	Type         string   `json:"type"          validate:"required,oneof=medical food rescue shelter"`
+	Type         string   `json:"type"          validate:"required"`
 	LocationName string   `json:"location_name" validate:"required"`
 	Latitude     *float64 `json:"latitude"`
 	Longitude    *float64 `json:"longitude"`

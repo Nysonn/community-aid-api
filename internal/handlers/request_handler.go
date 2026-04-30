@@ -7,6 +7,7 @@ import (
 	"log"
 	"net/http"
 	"strconv"
+	"time"
 
 	"community-aid-api/internal/helpers"
 	"community-aid-api/internal/middleware"
@@ -215,23 +216,25 @@ func (h *RequestHandler) CreateRequest(c *gin.Context) {
 	}
 
 	var mediaURLs []string
-	if form := c.Request.MultipartForm; form != nil {
+	if form, err := c.MultipartForm(); err == nil && form != nil {
 		files := form.File["media"]
 		if len(files) > 5 {
 			files = files[:5]
 		}
-		for _, fh := range files {
+		for i, fh := range files {
 			file, err := fh.Open()
 			if err != nil {
-				log.Printf("warn: could not open uploaded file %s: %v", fh.Filename, err)
+				log.Printf("warn: could not open uploaded file[%d] %s: %v", i, fh.Filename, err)
 				continue
 			}
-			result, err := h.cld.Upload.Upload(c.Request.Context(), file, uploader.UploadParams{
+			uploadCtx, cancel := context.WithTimeout(context.Background(), 60*time.Second)
+			result, uploadErr := h.cld.Upload.Upload(uploadCtx, file, uploader.UploadParams{
 				Folder: "community-aid/requests",
 			})
+			cancel()
 			file.Close()
-			if err != nil {
-				log.Printf("warn: cloudinary upload failed for %s: %v", fh.Filename, err)
+			if uploadErr != nil {
+				log.Printf("warn: cloudinary upload failed for file[%d] %s: %v", i, fh.Filename, uploadErr)
 				continue
 			}
 			mediaURLs = append(mediaURLs, result.SecureURL)

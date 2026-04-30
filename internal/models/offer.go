@@ -36,7 +36,7 @@ type CreateOfferInput struct {
 	RequestID           string   `json:"request_id" validate:"required"`
 	ResponderName       string   `json:"responder_name" validate:"required"`
 	ResponderContact    string   `json:"responder_contact" validate:"required"`
-	OfferType           string   `json:"offer_type" validate:"required,oneof=transport donation expertise"`
+	OfferType           string   `json:"offer_type" validate:"required"`
 	ExpertiseDetails    *string  `json:"expertise_details,omitempty"`
 	VehicleType         *string  `json:"vehicle_type,omitempty"`
 	DonationAmount      *float64 `json:"donation_amount,omitempty" validate:"omitempty,gt=0"`
